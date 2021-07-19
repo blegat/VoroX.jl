@@ -1,3 +1,8 @@
+# `CartesianIndex(id, simplex_id)` where
+#    id::Int # which facet of the simplex from 1 to `N+1` ?
+#    simplex_id::Int # id of center in `centers` of the `N`-dimensional simplex
+const Facet = CartesianIndex{2}
+
 struct Foam{N,T}
     # Delaunay nodes or Voronoi region/sites
     points::Vector{SVector{N,T}}
@@ -5,14 +10,32 @@ struct Foam{N,T}
     simplices::Matrix{Int}
     # Delaunay centers or Voronoi vertices
     centers::Vector{SVector{N,T}}
+    # Maps a `f1::Facet` the unique `f2::Facet` such that
+    # their points are the same.
+    voronoi_edges::Matrix{Facet}
 end
 
 function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) where {N,T}
     centers = SVector{N,T}[center(points[simplices[:, i]], centering) for i in 1:size(simplices, 2)]
+    voronoi_edges = zeros(Facet, size(simplices)...)
+    active = Dict{Vector{Int},Facet}()
+    for facet in CartesianIndices(simplices)
+        I = sort(setdiff(1:(N+1), facet[1]))
+        pidx = simplices[I, facet[2]]
+        if haskey(active, pidx)
+            facet2 = active[pidx]
+            @assert iszero(voronoi_edges[facet2])
+            voronoi_edges[facet] = facet2
+            voronoi_edges[facet2] = facet
+        else
+            active[pidx] = facet
+        end
+    end
     return Foam(
         points,
         simplices,
         centers,
+        voronoi_edges,
     )
 end
 
