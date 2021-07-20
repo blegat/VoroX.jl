@@ -13,6 +13,22 @@ struct Foam{N,T}
     # Maps a `f1::Facet` the unique `f2::Facet` such that
     # their points are the same.
     voronoi_edges::Matrix{Facet}
+    # Maps a `f1::Facet` such that `f2::Facet` is taken after `f1`
+    # in the knots dynamic.
+    active_edges::Matrix{Facet}
+end
+
+function facet_dir(points, simplices, centers, from::Facet, to::Facet)
+    c1 = centers[from[2]]
+    c2 = centers[to[2]]
+    if c1 ≈ c2
+        # Happens for instance if the points of the
+        # two simplices belong to the same hypersphere.
+        #return normalize(points[simplices[to]] - points[simplices[from]])
+        c1 = center(points[simplices[:, from[2]]], Barycenter())
+        c2 = center(points[simplices[:, to[2]]], Barycenter())
+    end
+    return normalize(c2 - c1)
 end
 
 function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) where {N,T}
@@ -31,11 +47,37 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
             active[pidx] = facet
         end
     end
+    active_edges = map(CartesianIndices(simplices)) do facet
+        mirror = voronoi_edges[facet]
+        best = zero(Facet)
+        best_dot = -one(T)
+        if iszero(mirror)
+            return best
+        end
+        simplex = mirror[2]
+        dir = facet_dir(points, simplices, centers, facet, mirror)
+        for i in 1:(N+1)
+            next = Facet(i, simplex)
+            if next != mirror
+                next_next = voronoi_edges[next]
+                if !iszero(next_next)
+                    next_dir = facet_dir(points, simplices, centers, mirror, next_next)
+                    cur_dot = dot(dir, next_dir)
+                    if cur_dot > best_dot
+                        best = next
+                        best_dot = cur_dot
+                    end
+                end
+            end
+        end
+        return best
+    end
     return Foam(
         points,
         simplices,
         centers,
         voronoi_edges,
+        active_edges,
     )
 end
 
