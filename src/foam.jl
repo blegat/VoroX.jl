@@ -18,6 +18,8 @@ struct Foam{N,T}
     active_edges::Matrix{Facet}
     # The cycles in the union of cycles formed by `active_edges`.
     knots::Vector{Vector{Facet}}
+    # Maps a facet to the index in `knots` of the knot the dynamics leads it to.
+    facet_knot::Matrix{Int}
 end
 
 function facet_dir(points, simplices, centers, from::Facet, to::Facet)
@@ -75,6 +77,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
         return best
     end
     visited = falses(size(simplices)...)
+    facet_knot = zeros(Int, size(simplices)...)
     knots = Vector{Facet}[]
     for facet in CartesianIndices(simplices)
         if !visited[facet]
@@ -86,13 +89,20 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
                 knot_index[cur] = length(knot)
                 cur = active_edges[cur]
             end
-            if !iszero(cur) && !visited[cur]
+            if iszero(cur)
+                start_knot = length(knot) + 1
+                target_knot = 0
+            elseif visited[cur]
+                start_knot = length(knot) + 1
+                target_knot = facet_knot[cur]
             else
                 start_knot = knot_index[cur]
                 push!(knots, knot[start_knot:end])
+                target_knot = length(knots)
             end
             for i in eachindex(knot)
                 visited[knot[i]] = true
+                facet_knot[knot[i]] = target_knot
             end
         end
     end
@@ -102,6 +112,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
         centers,
         voronoi_edges,
         active_edges,
+        facet_knot,
         knots,
     )
 end
