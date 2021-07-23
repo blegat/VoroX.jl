@@ -20,6 +20,9 @@ struct Foam{N,T}
     knots::Vector{Vector{Facet}}
     # Maps a facet to the index in `knots` of the knot the dynamics leads it to.
     facet_knot::Matrix{Int}
+    # Maps a facet to the length of the path util it reaches the knot or zero
+    # if it is part of the knot.
+    knot_dist::Matrix{Int}
 end
 
 function facet_dir(points, simplices, centers, from::Facet, to::Facet)
@@ -78,6 +81,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
     end
     visited = falses(size(simplices)...)
     facet_knot = zeros(Int, size(simplices)...)
+    knot_dist = zeros(Int, size(simplices)...)
     knots = Vector{Facet}[]
     for facet in CartesianIndices(simplices)
         if !visited[facet]
@@ -93,7 +97,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
                 start_knot = length(knot) + 1
                 target_knot = 0
             elseif visited[cur]
-                start_knot = length(knot) + 1
+                start_knot = length(knot) + 1 + knot_dist[cur]
                 target_knot = facet_knot[cur]
             else
                 start_knot = knot_index[cur]
@@ -103,6 +107,9 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
             for i in eachindex(knot)
                 visited[knot[i]] = true
                 facet_knot[knot[i]] = target_knot
+                if i < start_knot
+                    knot_dist[knot[i]] = start_knot - i
+                end
             end
         end
     end
@@ -112,8 +119,9 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
         centers,
         voronoi_edges,
         active_edges,
-        facet_knot,
         knots,
+        facet_knot,
+        knot_dist,
     )
 end
 
