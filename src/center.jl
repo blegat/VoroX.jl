@@ -13,3 +13,8 @@ function center(points::Vector{SVector{2,T}}, ::Circumcenter) where T
         ad*(c[1]-b[1]) + bd*(a[1]-c[1]) + cd*(b[1]-a[1]),
     )
 end
+
+struct Barycenter <: AbstractSimplexCenter end
+function center(points::Vector, ::Barycenter) where T
+    return sum(points) / length(points)
+end
