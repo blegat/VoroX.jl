@@ -1,5 +1,6 @@
 module NN
 
+using LinearAlgebra
 using StaticArrays, NearestNeighbors
 
 struct GridTree{N,T}
@@ -8,7 +9,7 @@ struct GridTree{N,T}
     grid::Array{Int,N}
 end
 function index(g::GridTree, p::SVector)
-    return Int.(size(g.grid) .* (p-g.a) ./ (g.b-g.a))
+    return ceil.(Int, size(g.grid) .* (p-g.a) ./ (g.b-g.a))
 end
 
 mutable struct InRadius{NN, N, T}
@@ -20,7 +21,7 @@ function InRadius(::Type{GridTree}, data, r, a, b)
     length = r / √2
     n = ceil.(Int, (b .- a) ./ length)
     grid = zeros(Int, n...)
-    obj = InRadius(GridTree(a, b, grid), copy(data), r)
+    obj = InRadius(GridTree(a, b, grid), eltype(data)[], r)
     for p in data
         push!(obj, p)
     end
@@ -32,19 +33,22 @@ end
 
 
 function Base.in(p, r::InRadius)
-    return radius(r, p) < r
+    return radius(r, p) < r.r
 end
 Base.length(r::InRadius) = length(r.points)
 Base.getindex(r::InRadius, i) = r.points[i]
 
 widen(i::Int) = (i - 2):(i + 2)
-function radius(g::InRadius{<:GridTree}, p::SVector) where {N,T}
+function radius(g::InRadius{<:GridTree}, p::SVector{N,T}) where {N,T}
     i = index(g.inner, p)
     radius = typemax(T)
-    for I in Iterators.product(widen.(i)...)
-        j = g.inner.grid[I]
-        if !iszero(j)
-            radius = min(radius, norm(g.points[j] - p))
+    for _I in Iterators.product(widen.(i)...)
+        I = CartesianIndex(_I...)
+        if I in CartesianIndices(g.inner.grid)
+            j = g.inner.grid[I]
+            if !iszero(j)
+                radius = min(radius, norm(g.points[j] - p))
+            end
         end
     end
     return radius
