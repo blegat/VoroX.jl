@@ -1,19 +1,18 @@
 # Sample Set of Points in Region
-function random_points(K::Int, a::SVector, b::SVector, algo)
-    r = norm(b - a) / √(π * K)
+function random_points(K::Int, a::SVector, b::SVector, algo; maxtries = 2K)
+    # Inequality between volumes:
+    # K * πr^2 < prod(b .- a)
+    r = prod(b .- a) / √(π * K)
+    r /= 2
 
     # Setup Grid
-    set = InRadius(algo, [(a + b) / 2], r, a, b)
+    set = NN.InRadius(algo, [(a + b) / 2], r, a, b)
 
     # Now Generate New Samples by Iterating over the Set
     tries = 0
 
     K -= 1
-    while K > 0
-        if tries > length(set)
-            break
-        end
-
+    while K > 0 && tries < maxtries
         # Sample Uniformly from Set
         n = rand(1:length(set))
 
@@ -25,10 +24,7 @@ function random_points(K::Int, a::SVector, b::SVector, algo)
         # New Sample Position, Grid Index
         p = set[n] + len * dir
         if !all(a .< p .< b)
-            continue
-        end
-
-        if p in set
+        elseif p in set
             tries += 1
         else
             push!(set, p)
