@@ -1,5 +1,5 @@
 # Sample Set of Points in Region
-function random_points(K::Int, a::SVector, b::SVector, algo; maxtries = 2K)
+function random_points(K::Int, a::SVector, b::SVector, algo = NN.GridTree; maxtries = 2K)
     # Inequality between volumes:
     # K * πr^2 < prod(b .- a)
     r = prod(b .- a) / √(π * K)
