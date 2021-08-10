@@ -1,3 +1,5 @@
+using Polyhedra
+
 # `CartesianIndex(id, simplex_id)` where
 #    id::Int # which facet of the simplex from 1 to `N+1` ?
 #    simplex_id::Int # id of center in `centers` of the `N`-dimensional simplex
@@ -126,21 +128,40 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
 end
 
 function Foam(points::Vector{SVector{N,T}}, algo::Polyhedra.Library, args...) where {N,T}
-    lifted = [SVector(p..., norm(p)) for p in points]
+    lifted = [SVector(p..., norm(p)^2) for p in points]
     p = polyhedron(vrep(lifted), algo)
-    simplices_h = filter(collect(Polyhedra.Indices{T,Polyhedra.halfspacetype(p)}(p))) do hi
-        h = get(p, hi)
-        return Polyhedra._neg(h.a[end])
-    end
-    simplices = Matrix{Int}(undef, N+1, length(simplices_h))
-    for (i, hi) in enumerate(simplices_h)
-        vertices_idx = incidentpointindices(p, hi)
+    _simplices = Vector{Int}[]
+    function add_Δ(vr, vv, vertices_idx, idxmap)
         @assert length(vertices_idx) == N + 1
-        for j in 1:(N+1)
+        push!(_simplices, map(1:(N+1)) do j
             vi = vertices_idx[j]
-            @assert get(p, vi) == lifted[vi.value]
-            simplices[j, i] = vi.value
+            @assert get(vr, vi) == vv[vi.value]
+            idxmap[vi.value]
+        end)
+    end
+    for hi in Polyhedra.Indices{T,Polyhedra.halfspacetype(p)}(p)
+        h = get(p, hi)
+        if Polyhedra._neg(h.a[end])
+            vertices_idx = incidentpointindices(p, hi)
+            @assert length(vertices_idx) >= N + 1
+            if length(vertices_idx) == N + 1
+                add_Δ(p, lifted, vertices_idx, eachindex(lifted))
+            else
+                idx = map(vertices_idx) do vi
+                    @assert get(p, vi) == lifted[vi.value]
+                    vi.value
+                end
+                vv = points[idx]
+                vr = polyhedron(vrep(vv), algo)
+                for Δ in triangulation_indices(vr)
+                    add_Δ(vr, vv, Δ, idx)
+                end
+            end
         end
+    end
+    simplices = Matrix{Int}(undef, N+1, length(_simplices))
+    for (i, Δ) in enumerate(_simplices)
+        simplices[:, i] = Δ
     end
     return Foam(points, simplices, args...)
 end
