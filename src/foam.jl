@@ -1,4 +1,5 @@
 using Polyhedra
+import VoronoiDelaunay
 
 # `CartesianIndex(id, simplex_id)` where
 #    id::Int # which facet of the simplex from 1 to `N+1` ?
@@ -162,6 +163,37 @@ function Foam(points::Vector{SVector{N,T}}, algo::Polyhedra.Library, args...) wh
     simplices = Matrix{Int}(undef, N+1, length(_simplices))
     for (i, Δ) in enumerate(_simplices)
         simplices[:, i] = Δ
+    end
+    return Foam(points, simplices, args...)
+end
+
+function Foam(points::Vector{SVector{2,T}}, algo::Type{<:VoronoiDelaunay.DelaunayTessellation2D}, args...) where {T}
+    tess = VoronoiDelaunay.DelaunayTessellation(length(points))
+    # VoronoiDelaunay currently needs the points to be between 1 + ε and 2 - 2ε
+    a = reduce((a, b) -> min.(a, b), points, init=SVector(Inf, Inf))
+    b = reduce((a, b) -> max.(a, b), points, init=SVector(-Inf, -Inf))
+    width = b .- a
+    scaled = map(points) do p
+        # Multipltiply by 1.0001 to be sure to be in [1 + ε, 2 - 2ε]
+        x = (p .- a) ./ (width * (1 + 1e-4)) .+ (1 + 1e-6)
+        @assert all(x) do c
+            1 + eps(Float64) < c < 2 - 2eps(Float64)
+        end
+        return VoronoiDelaunay.Point2D(x...)
+    end
+    # Should construct before as `tess` modifies `scaled`.
+    back = Dict(p => i for (i, p) in enumerate(scaled))
+    push!(tess, scaled)
+    Δs = VoronoiDelaunay.DelaunayTriangle{VoronoiDelaunay.GeometricalPredicates.Point2D}[]
+    # Cannot collect as it does not implement length nor IteratorSize
+    for Δ in tess
+        push!(Δs, Δ)
+    end
+    simplices = Matrix{Int}(undef, 3, length(Δs))
+    for (i, Δ) in enumerate(Δs)
+        simplices[1, i] = back[VoronoiDelaunay.geta(Δ)]
+        simplices[2, i] = back[VoronoiDelaunay.getb(Δ)]
+        simplices[3, i] = back[VoronoiDelaunay.getc(Δ)]
     end
     return Foam(points, simplices, args...)
 end
