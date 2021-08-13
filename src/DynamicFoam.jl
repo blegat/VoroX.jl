@@ -10,10 +10,10 @@ include("foam.jl")
 #include("plotting.jl")
 
 function markersize_range(::typeof(scatter!), r)
-    return LinRange(r, 100r, 100), 10r
+    return LinRange(r, 100r, 20), 10r
 end
 function markersize_range(::typeof(meshscatter!), r)
-    return LinRange(r / 1000, r / 10, 100), r / 100
+    return LinRange(r / 1000, r / 10, 20), r / 100
 end
 
 function viz(foam, a, b, scatterfun=scatter!)
@@ -23,6 +23,8 @@ function viz(foam, a, b, scatterfun=scatter!)
     r, start = markersize_range(scatterfun, norm(b - a))
     point_size = Slider(fig[2, 1], range = r, startvalue = start)
     center_size = Slider(fig[3, 1], range = r, startvalue = start / 2)
+    knot_width = Slider(fig[4, 1], range = LinRange(0.1, 10, 20), startvalue = 1)
+    dist_decay = Slider(fig[5, 1], range = LinRange(0, 1, 100), startvalue = 0.9)
     for simplex in 1:size(foam.simplices, 2)
         for i in 1:size(foam.simplices, 1)
             for j in 1:(i-1)
@@ -33,6 +35,21 @@ function viz(foam, a, b, scatterfun=scatter!)
                 lines!(s, [a, b])
             end
         end
+    end
+    for facet in CartesianIndices(foam.simplices)
+        d = foam.knot_dist[facet]
+        next = foam.voronoi_edges[facet]
+        if d > 0 && !iszero(next)
+            a = foam.centers[facet[2]]
+            b = foam.centers[next[2]]
+            lw = @lift($(knot_width.value) * $(dist_decay.value)^d)
+            lines!(s, [a, b], color=:yellow, linewidth=lw)
+        end
+    end
+    for knot in foam.knots
+        c = foam.centers[getindex.(knot, 2)]
+        push!(c, c[1])
+        lines!(s, getindex.(c, 1), getindex.(c, 2), color=:orange, linewidth = knot_width.value)
     end
     scatterfun(s, foam.points, markersize = point_size.value, color=:red)
     scatterfun(s, foam.centers, markersize = center_size.value, color=:blue)
