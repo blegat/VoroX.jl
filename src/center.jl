@@ -14,7 +14,58 @@ function center(points::Vector{SVector{2,T}}, ::Circumcenter) where T
     )
 end
 
-struct Barycenter <: AbstractSimplexCenter end
-function center(points::Vector, ::Barycenter) where T
+# From https://en.wikipedia.org/wiki/Tetrahedron#Circumcenter
+# Doesn't seem to work
+#function center(points::Vector{SVector{3,T}}, ::Circumcenter) where T
+#    @assert length(points) == 4
+#    a, b, c, d = points
+#    A = [(b - a)'; (c - a)'; (d - a)']::SMatrix{3,3,T}
+#    display(A)
+#    display(A.^2)
+#    display(sum(A.^2, dims=2))
+#    B = vec(sum(A.^2, dims=2))::SVector{3,T}
+#    B = SVector(norm(b - a)^2, norm(c - a)^2, norm(d - a)^2)::SVector{3,T}
+#    display(B)
+#    return (inv(A) * B) / 2
+#end
+
+function _det(A::SMatrix{4,3,T}) where T
+    o = SVector(one(T), one(T), one(T), one(T))
+    return det([A o]::SMatrix{4,4,T})
+end
+
+# From pp. 6-7 of https://people.sc.fsu.edu/~jburkardt/presentations/cg_lab_tetrahedrons.pdf
+function center(points::Vector{SVector{3,T}}, ::Circumcenter) where T
+    @assert length(points) == 4
+    a, b, c, d = points
+    o = SVector(one(T), one(T), one(T), one(T))
+    α = _det([a'; b'; c'; d'])
+    na = sum(a.^2)
+    nb = sum(b.^2)
+    nc = sum(c.^2)
+    nd = sum(d.^2)
+    Dx = _det(@SMatrix([
+        na a[2] a[3]
+        nb b[2] b[3]
+        nc c[2] c[3]
+        nd d[2] d[3]
+    ]))
+    Dy = _det(@SMatrix([
+        na a[1] a[3]
+        nb b[1] b[3]
+        nc c[1] c[3]
+        nd d[1] d[3]
+    ]))
+    Dz = _det(@SMatrix([
+        na a[1] a[2]
+        nb b[1] b[2]
+        nc c[1] c[2]
+        nd d[1] d[2]
+    ]))
+    return SVector(Dx, Dy, Dz) / (2 * α)
+end
+
+struct Centroid <: AbstractSimplexCenter end
+function center(points::Vector, ::Centroid) where T
     return sum(points) / length(points)
 end

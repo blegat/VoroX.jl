@@ -13,7 +13,7 @@ struct Foam{N,T}
     simplices::Matrix{Int}
     # Delaunay centers or Voronoi vertices
     centers::Vector{SVector{N,T}}
-    # Maps a `f1::Facet` the unique `f2::Facet` such that
+    # Maps a `f1::Facet` to the unique `f2::Facet` such that
     # their points are the same.
     voronoi_edges::Matrix{Facet}
     # Maps a `f1::Facet` such that `f2::Facet` is taken after `f1`
@@ -35,8 +35,8 @@ function facet_dir(points, simplices, centers, from::Facet, to::Facet)
         # Happens for instance if the points of the
         # two simplices belong to the same hypersphere.
         #return normalize(points[simplices[to]] - points[simplices[from]])
-        c1 = center(points[simplices[:, from[2]]], Barycenter())
-        c2 = center(points[simplices[:, to[2]]], Barycenter())
+        c1 = center(points[simplices[:, from[2]]], Centroid())
+        c2 = center(points[simplices[:, to[2]]], Centroid())
     end
     return normalize(c2 - c1)
 end
