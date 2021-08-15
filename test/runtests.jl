@@ -58,6 +58,17 @@ function test_random_points(algo)
     ]
 end
 
+function test_center()
+    points = [
+        SVector(-1,  0, -1/√2),
+        SVector( 1,  0, -1/√2),
+        SVector( 0, -1,  1/√2),
+        SVector( 0,  1,  1/√2),
+    ]
+    @test DynamicFoam.center(points, DynamicFoam.Circumcenter()) ≈ zeros(3) atol=1e-12
+    @test DynamicFoam.center(points, DynamicFoam.Centroid()) ≈ zeros(3) atol=1e-12
+end
+
 @testset "Grid $lib" for lib in [
     CDDLib.Library(:float),
     VoronoiDelaunay.DelaunayTessellation2D,
@@ -71,4 +82,8 @@ end
 
 @testset "random_points" begin
     test_random_points(DynamicFoam.NN.GridTree)
+end
+
+@testset "center" begin
+    test_center()
 end
