@@ -38,6 +38,7 @@ function test_grid_1(lib)
             end
         end
     end
+    @test length(foam.num_catched) == length(foam.knots)
 end
 
 using Random

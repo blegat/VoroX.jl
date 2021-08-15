@@ -26,6 +26,8 @@ struct Foam{N,T}
     # Maps a facet to the length of the path util it reaches the knot or zero
     # if it is part of the knot.
     knot_dist::Matrix{Int}
+    # Number of facets out of the knot that converge to the knot.
+    num_catched::Vector{Int}
 end
 
 function facet_dir(points, simplices, centers, from::Facet, to::Facet)
@@ -86,6 +88,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
     facet_knot = zeros(Int, size(simplices)...)
     knot_dist = zeros(Int, size(simplices)...)
     knots = Vector{Facet}[]
+    num_catched = Int[]
     for facet in CartesianIndices(simplices)
         if !visited[facet]
             knot = [facet]
@@ -105,6 +108,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
             else
                 start_knot = knot_index[cur]
                 push!(knots, knot[start_knot:end])
+                push!(num_catched, 0)
                 target_knot = length(knots)
             end
             for i in eachindex(knot)
@@ -112,6 +116,9 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
                 facet_knot[knot[i]] = target_knot
                 if i < start_knot
                     knot_dist[knot[i]] = start_knot - i
+                    if !iszero(target_knot)
+                        num_catched[target_knot] += 1
+                    end
                 end
             end
         end
@@ -125,6 +132,7 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
         knots,
         facet_knot,
         knot_dist,
+        num_catched,
     )
 end
 
