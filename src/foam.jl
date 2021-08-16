@@ -9,7 +9,7 @@ const Facet = CartesianIndex{2}
 struct Foam{N,T}
     # Delaunay nodes or Voronoi region/sites
     points::Vector{SVector{N,T}}
-    # `simplices[id, :]` contains the of the `points` in the simplex `id`.
+    # `simplices[:, id]` contains the of the `points` in the simplex `id`.
     simplices::Matrix{Int}
     # Delaunay centers or Voronoi vertices
     centers::Vector{SVector{N,T}}
