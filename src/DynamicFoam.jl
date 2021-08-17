@@ -33,90 +33,103 @@ function viz(foam::Foam{N,T}, a, b, algo, centering, scatterfun=scatter!) where 
     r, start = markersize_range(scatterfun, norm(b - a))
     point_size = Slider(fig, range = r, startvalue = start)
     center_size = Slider(fig, range = r, startvalue = start / 2)
+    delaunay_edge_width = Slider(fig, range = LinRange(0, 10, 20), startvalue = 1)
     knot_width = Slider(fig, range = LinRange(0.1, 10, 20), startvalue = 1)
     dist_decay = Slider(fig, range = LinRange(0, 1, 100), startvalue = 0.9)
-    energy = Slider(fig, range = LinRange(0, 10, 100), startvalue = 0.1)
-    scale = Slider(fig, range = LinRange(0, 10, 100), startvalue = 0.1)
+    energy = Slider(fig, range = LinRange(0, 0.1, 100), startvalue = 0.01)
+    scale = Slider(fig, range = LinRange(0, 10, 100), startvalue = 0.5)
     equilibration = Toggle(fig, active = true)
     contractive = Toggle(fig, active = true)
     expansive = Toggle(fig, active = true)
     toggles = GridLayout()
     toggles[:h] = [equilibration, contractive, expansive]
-    menu = GridLayout()
-    menu[:v] = [height, point_size, center_size, knot_width, dist_decay, energy, scale, toggles]
-    obs_foam = Node(foam)
     t = Node(0)
     dt = 1
+    time = Label(fig, @lift(string($t)))
+    menu = GridLayout()
+    menu[:v] = [time, height, point_size, center_size, delaunay_edge_width, knot_width, dist_decay, energy, scale, toggles]
+
+    obs_foam = Node(foam)
     delaunay_edges = Node(zeros(T, 0, 0))
-    function draw(foam)
-    end
-    s = LScene(fig, height = height.value)
-    text!(s, @lift(string($t)), position = a + 0.99 * (b - a))
-    points = SVector{N,T}[]
-    for simplex in 1:size(foam.simplices, 2)
-        for i in 1:size(foam.simplices, 1)
-            for j in 1:(i-1)
-                from = foam.simplices[i, simplex]
-                to = foam.simplices[j, simplex]
-                a = foam.points[from]
-                b = foam.points[to]
-                push!(points, a)
-                push!(points, b)
-            end
-        end
-    end
-    delaunay_edges[] = _flat(points)
-    empty!(points)
-    linesegments!(s, delaunay_edges)
-    dists = Int[]
-    out_knot_edges = Dict()
-    #out_knot_edges = Node(zeros(T, 0, 0))
-    #dists = Node(Int[])
-    for facet in CartesianIndices(foam.simplices)
-        d = foam.knot_dist[facet]
-        next = foam.voronoi_edges[facet]
-        if d > 0 && !iszero(next)
-            a = foam.centers[facet[2]]
-            b = foam.centers[next[2]]
-            #push!(out_knot_lw, @lift($(knot_width.value) * $(dist_decay.value)^d))
-            #push!(out_knot_lw, knot_width.value[] * dist_decay.value[]^d)
-            push!(points, a)
-            push!(points, b)
-            if haskey(out_knot_edges, d)
-                push!(out_knot_edges[d], a)
-                push!(out_knot_edges[d], b)
-            else
-                out_knot_edges[d] = [a, b]
-            end
-        end
-    end
     out_knot_edges_obs = Dict()
-    for (d, v) in out_knot_edges
-        m = _flat(out_knot_edges[d])
-        if haskey(out_knot_edges_obs, d)
-            out_knot_edges_obs[d][] = m
-        else
-            lw = @lift($(knot_width.value) * $(dist_decay.value)^d)
-            mobs = Node(m)
-            linesegments!(s, mobs, color=:yellow, linewidth=lw)
-            out_knot_edges_obs[d] = mobs
+    knot_obs = []
+    foam_points = Node(SVector{N,T}[])
+    foam_centers = Node(SVector{N,T}[])
+    s = LScene(fig, height = height.value)
+
+    function draw(foam)
+        points = SVector{N,T}[]
+        for simplex in 1:size(foam.simplices, 2)
+            for i in 1:size(foam.simplices, 1)
+                for j in 1:(i-1)
+                    from = foam.simplices[i, simplex]
+                    to = foam.simplices[j, simplex]
+                    a = foam.points[from]
+                    b = foam.points[to]
+                    push!(points, a)
+                    push!(points, b)
+                end
+            end
         end
+        delaunay_edges[] = _flat(points)
+
+        dists = Int[]
+        out_knot_edges = Dict()
+        for facet in CartesianIndices(foam.simplices)
+            d = foam.knot_dist[facet]
+            next = foam.voronoi_edges[facet]
+            if d > 0 && !iszero(next)
+                a = foam.centers[facet[2]]
+                b = foam.centers[next[2]]
+                if haskey(out_knot_edges, d)
+                    push!(out_knot_edges[d], a)
+                    push!(out_knot_edges[d], b)
+                else
+                    out_knot_edges[d] = [a, b]
+                end
+            end
+        end
+        for (d, v) in out_knot_edges
+            m = _flat(out_knot_edges[d])
+            if haskey(out_knot_edges_obs, d)
+                out_knot_edges_obs[d][] = m
+            else
+                lw = @lift($(knot_width.value) * $(dist_decay.value)^d)
+                mobs = Node(m)
+                linesegments!(s, mobs, color=:yellow, linewidth=lw)
+                out_knot_edges_obs[d] = mobs
+            end
+        end
+
+        i = 0
+        for knot in foam.knots
+            c = foam.centers[getindex.(knot, 2)]
+            push!(c, c[1])
+            m = _flat(c)
+            i += 1
+            if i > length(knot_obs)
+                obs = Node(m)
+                lines!(s, obs, color=:orange, linewidth = knot_width.value)
+                push!(knot_obs, obs)
+            else
+                knot_obs[i][] = m
+            end
+        end
+        for j in (i+1):length(knot_obs)
+            knot_obs[j][] = zeros(T, N, 0)
+        end
+
+        foam_points[] = foam.points
+        foam_centers[] = foam.centers
     end
-    #@out_knot_edges_obs[] = _flat(points)
-    #out_knot_lw = @lift($(knot_width.value) * $(dist_decay.value).^$dists)
-    #@show length(out_knot_lw)
-    #linesegments!(s, out_knot_edges)
-    #linesegments!(s, out_knot_edges, color=:yellow, linewidth=out_knot_lw)
-    for knot in foam.knots
-        c = foam.centers[getindex.(knot, 2)]
-        push!(c, c[1])
-        lines!(s, getindex.(c, 1), getindex.(c, 2), color=:orange, linewidth = knot_width.value)
-    end
-    scatterfun(s, foam.points, markersize = point_size.value, color=:red)
-    scatterfun(s, foam.centers, markersize = center_size.value, color=:blue)
+    draw(foam)
+
+    linesegments!(s, delaunay_edges, linewidth = delaunay_edge_width.value)
+    scatterfun(s, foam_points, markersize = point_size.value, color=:red)
+    scatterfun(s, foam_centers, markersize = center_size.value, color=:blue)
+
     fig[1, 1] = menu
     fig[1, 2] = s
-    draw(foam)
     on(draw, obs_foam)
     on(events(fig).keyboardbutton) do event
         if event.action in (Keyboard.press, Keyboard.repeat) &&

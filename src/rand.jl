@@ -31,5 +31,10 @@ function random_points(K::Int, a::SVector, b::SVector, algo = NN.GridTree; maxtr
             K -= 1
         end
     end
+
+    if K > 0
+        @warn("Generated $(length(set.points)), missing $K points.")
+    end
+
     return set.points
 end
