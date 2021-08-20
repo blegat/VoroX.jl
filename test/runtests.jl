@@ -1,6 +1,9 @@
 using Test
+
+using StaticArrays
 import CDDLib
 import QHull
+import VoronoiDelaunay
 include("../src/DynamicFoam.jl")
 
 function _test_grid(n, lib)
