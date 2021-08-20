@@ -184,8 +184,10 @@ function Foam(points::Vector{SVector{2,T}}, algo::Type{<:VoronoiDelaunay.Delauna
     scaled = map(points) do p
         # Multipltiply by 1.0001 to be sure to be in [1 + ε, 2 - 2ε]
         x = (p .- a) ./ (width * (1 + 1e-4)) .+ (1 + 1e-6)
-        @assert all(x) do c
-            1 + eps(Float64) < c < 2 - 2eps(Float64)
+        for c in x
+            if !(1 + eps(Float64) < c < 2 - 2eps(Float64))
+                error("Point $p was mapped to $c for which the coordonate $x is not in the interval [$(1 + eps(Float64)), $(2 - 2eps(Float64)))]")
+            end
         end
         return VoronoiDelaunay.Point2D(x...)
     end

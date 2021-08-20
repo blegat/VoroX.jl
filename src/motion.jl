@@ -1,4 +1,17 @@
-function gradient(foam::Foam{N,T}, scale, energy, equilibration::Bool, contractive::Bool, expansive::Bool) where {N,T}
+function homothety(Δ, catchment, scale, energy, equilibration::Bool, contractive::Bool, expansive::Bool)
+    h = 0.0
+    if equilibration
+        h += 1 - scale / norm(Δ)
+    end
+    if contractive
+        h += 1 - scale / norm(Δ) * (1 - catchment)
+    end
+    if expansive
+        h += 1 - scale / norm(Δ) * catchment
+    end
+    return energy * Δ * h
+end
+function gradient(foam::Foam{N,T}, edge_scale::Bool, args...) where {N,T}
     ∇ = [zero(SVector{N,T}) for i in eachindex(foam.points)]
     for simplex in 1:size(foam.simplices, 2)
         catchment = 0.0
@@ -15,18 +28,16 @@ function gradient(foam::Foam{N,T}, scale, energy, equilibration::Bool, contracti
         ps = foam.points[pidxs]
         c = center(ps, Centroid())
         for (pidx, p) in zip(pidxs, ps)
-            Δ = c - p
-            h = 0.0
-            if equilibration
-                h += 1 - scale / norm(Δ)
+            if edge_scale
+                # Similar to https://github.com/weigert/DynamicFoam
+                for (qidx, q) in zip(pidxs, ps)
+                    if qidx != pidx
+                        ∇[pidx] += homothety(q - p, catchment, args...)
+                    end
+                end
+            else
+                ∇[pidx] += homothety(c - p, catchment, args...)
             end
-            if contractive
-                h += 1 - scale / norm(Δ) * (1 - catchment)
-            end
-            if expansive
-                h += 1 - scale / norm(Δ) * catchment
-            end
-            ∇[pidx] += energy * (c - foam.points[pidx]) * h
         end
     end
     return ∇

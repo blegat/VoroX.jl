@@ -59,16 +59,19 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     set_close_to!(dynamic_sl.sliders[ENERGY], 0.0005)
     set_close_to!(dynamic_sl.sliders[SCALE], 0.5)
 
+    edge_scale = Toggle(fig, active = true)
     equilibration = Toggle(fig, active = true)
     contractive = Toggle(fig, active = true)
     expansive = Toggle(fig, active = true)
     toggles = GridLayout()
-    toggles[1, 1] = Label(fig, "Equilibration")
-    toggles[1, 2] = equilibration
-    toggles[2, 1] = Label(fig, "Contractive")
-    toggles[2, 2] = contractive
-    toggles[3, 1] = Label(fig, "Expansive")
-    toggles[3, 2] = expansive
+    toggles[1, 1] = Label(fig, "Edge scale")
+    toggles[1, 2] = edge_scale
+    toggles[2, 1] = Label(fig, "Equilibration")
+    toggles[2, 2] = equilibration
+    toggles[3, 1] = Label(fig, "Contractive")
+    toggles[3, 2] = contractive
+    toggles[4, 1] = Label(fig, "Expansive")
+    toggles[4, 2] = expansive
 
     num_points = labelslider!(fig, "Number of points", N:1000, format = x -> string(x), width=WIDTH, tellheight = true)
     set_close_to!(num_points.slider, K)
@@ -187,7 +190,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     on(draw, obs_foam)
     function integ()
         t[] += dt
-        obs_foam[] = integrate(obs_foam[], dt, algo, centering, dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
+        obs_foam[] = integrate(obs_foam[], dt, algo, centering, edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
     end
     on(events(fig).keyboardbutton) do event
         if event.action in (Keyboard.press, Keyboard.repeat) &&
