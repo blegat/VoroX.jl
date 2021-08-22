@@ -1,5 +1,6 @@
 using Polyhedra
 import VoronoiDelaunay
+import MiniQhull
 
 # `CartesianIndex(id, simplex_id)` where
 #    id::Int # which facet of the simplex from 1 to `N+1` ?
@@ -216,4 +217,9 @@ function Foam(points::Vector{SVector{2,T}}, algo::Type{<:VoronoiDelaunay.Delauna
         simplices[3, i] = back[VoronoiDelaunay.getc(Δ)]
     end
     return Foam(points, simplices, args...)
+end
+
+function Foam(points::Vector{SVector{N,T}}, algo::typeof(MiniQhull.delaunay), args...) where {N,T}
+    simplices = MiniQhull.delaunay(points)
+    return Foam(points, convert(Matrix{Int}, simplices), args...)
 end

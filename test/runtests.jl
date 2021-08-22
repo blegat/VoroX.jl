@@ -90,6 +90,7 @@ LIBRARIES = [
     CDDLib.Library(:float),
     VoronoiDelaunay.DelaunayTessellation2D,
     QHull.Library(),
+    MiniQhull.delaunay,
 ]
 
 @testset "Test issue 55 $lib" for lib in LIBRARIES
@@ -99,10 +100,14 @@ LIBRARIES = [
 end
 
 @testset "Grid $lib" for lib in LIBRARIES
-    if lib != VoronoiDelaunay.DelaunayTessellation2D && !isa(lib, QHull.Library)
-        test_grid_0(lib)
+    @testset "0" begin
+        if lib != VoronoiDelaunay.DelaunayTessellation2D && !isa(lib, QHull.Library) && lib != MiniQhull.delaunay
+            test_grid_0(lib)
+        end
     end
-    test_grid_1(lib)
+    @testset "1" begin
+        test_grid_1(lib)
+    end
 end
 
 @testset "random_points" begin
