@@ -149,8 +149,13 @@ function Foam(points::Vector{SVector{N,T}}, algo::Polyhedra.Library, args...) wh
         @assert length(vertices_idx) == N + 1
         push!(_simplices, map(1:(N+1)) do j
             vi = vertices_idx[j]
-            @assert get(vr, vi) == vv[vi.value]
-            idxmap[vi.value]
+            v = get(vr, vi)
+            if v == vv[vi.value]
+                i = vi.value
+            else
+                i = findfirst(isequal(v), vv)
+            end
+            idxmap[i]
         end)
     end
     for hi in Polyhedra.Indices{T,Polyhedra.halfspacetype(p)}(p)
