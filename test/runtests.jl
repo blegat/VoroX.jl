@@ -4,6 +4,7 @@ using StaticArrays
 import CDDLib
 import QHull
 import VoronoiDelaunay
+import MiniQhull
 include("../src/DynamicFoam.jl")
 
 function _test_grid(n, lib)
@@ -86,12 +87,7 @@ function test_center()
     @test DynamicFoam.center(points, DynamicFoam.Centroid()) ≈ zeros(3) atol=1e-12
 end
 
-LIBRARIES = [
-    CDDLib.Library(:float),
-    VoronoiDelaunay.DelaunayTessellation2D,
-    QHull.Library(),
-    MiniQhull.delaunay,
-]
+LIBRARIES = DynamicFoam.LIBRARIES
 
 @testset "Test issue 55 $lib" for lib in LIBRARIES
     if lib != VoronoiDelaunay.DelaunayTessellation2D

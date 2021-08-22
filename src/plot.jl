@@ -1,5 +1,5 @@
 function markersize_range(::typeof(scatter!), r)
-    return LinRange(r, 100r, 20), 10r
+    return LinRange(r / 10, 10r, 20), 1r
 end
 function markersize_range(::typeof(meshscatter!), r)
     return LinRange(r / 10000, r / 100, 20), r / 200
@@ -26,15 +26,15 @@ const WIDTH = 350
 const ENERGY = 1
 const SCALE = 2
 
-function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, centering, scatterfun=scatter!, args...) where {N,T}
+function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=scatter!, args...) where {N,T}
     set_theme!(backgroundcolor = ColorSchemes.tableau_red_black[end])
-    fig = Figure(resolution = (1200, 800))
+    fig = Figure(resolution = (1200, 1200))
     r, start = markersize_range(scatterfun, norm(max_coords - min_coords))
 
     display_sl = labelslidergrid!(
         fig,
         ["Height", "Point size", "Center size", "Edge width", "Circuit width", "Decay"],
-        [100:2000, r, r, LinRange(0, 10, 20), LinRange(0.1, 10, 20), LinRange(0, 1, 100)],
+        [100:2000, r, r, LinRange(0, 1, 20), LinRange(0.1, 10, 20), LinRange(0, 1, 100)],
         formats = [x -> "$(round(x, digits = 5))" for _ in 1:6],
         width = WIDTH,
         tellheight = true
@@ -43,14 +43,14 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     set_close_to!(display_sl.sliders[1], 800)
     set_close_to!(display_sl.sliders[2], start)
     set_close_to!(display_sl.sliders[3], start / 2)
-    set_close_to!(display_sl.sliders[4], 1)
+    set_close_to!(display_sl.sliders[4], 0.5)
     set_close_to!(display_sl.sliders[5], 1)
     set_close_to!(display_sl.sliders[6], 0.9)
 
     dynamic_sl = labelslidergrid!(
         fig,
         ["Energy", "Scale"],
-        [LinRange(0, 0.01, 1000), LinRange(0, 10, 100)],
+        [LinRange(0, 0.01, 1000), LinRange(0, 1, 100)],
         formats = [x -> "$(round(x, digits = 5))" for _ in 1:2],
         width = WIDTH,
         tellheight = true
@@ -66,12 +66,37 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     toggles = GridLayout()
     toggles[1, 1] = Label(fig, "Edge scale")
     toggles[1, 2] = edge_scale
-    toggles[2, 1] = Label(fig, "Equilibration")
-    toggles[2, 2] = equilibration
-    toggles[3, 1] = Label(fig, "Contractive")
-    toggles[3, 2] = contractive
-    toggles[4, 1] = Label(fig, "Expansive")
-    toggles[4, 2] = expansive
+    toggles[1, 3] = Label(fig, "Equilibration")
+    toggles[1, 4] = equilibration
+    toggles[2, 1] = Label(fig, "Contractive")
+    toggles[2, 2] = contractive
+    toggles[2, 3] = Label(fig, "Expansive")
+    toggles[2, 4] = expansive
+
+    lib_layout = GridLayout()
+    lib = Menu(fig, options = ["MiniQhull", "Qhull", "CDDLib", "VoronoiDelaunay"])
+    lib.i_selected = 1
+    lib_layout[:h] = [Label(fig, "Library"), lib]
+    current_library() = LIBRARIES[lib.i_selected[]]
+    on(lib.selection) do s
+        obs_foam[] = Foam(obs_foam[].points, current_library(), current_centering())
+    end
+
+    centering_layout = GridLayout()
+    centering = Menu(fig, options = ["Centroid", "Circumcenter"])
+    centering.i_selected = 1
+    centering_layout[:h] = [Label(fig, "Centering"), centering]
+    function current_centering()
+        if centering.i_selected[] == 1
+            return Centroid()
+        else
+            @assert centering.i_selected[] == 2
+            return Circumcenter()
+        end
+    end
+    on(centering.selection) do s
+        obs_foam[] = Foam(obs_foam[].points, current_library(), current_centering())
+    end
 
     num_points = labelslider!(fig, "Number of points", N:1000, format = x -> string(x), width=WIDTH, tellheight = true)
     set_close_to!(num_points.slider, K)
@@ -79,7 +104,8 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
 
     function resample(n)
         points = random_points(num_points.slider.value[], min_coords, max_coords, args...)
-        obs_foam[] = Foam(points, algo, centering)
+        t[] = 1
+        obs_foam[] = Foam(points, current_library(), current_centering())
     end
 
     on(resample, resample_button.clicks)
@@ -94,14 +120,22 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     )
     set_close_to!(record_frames.sliders[1], 10)
     set_close_to!(record_frames.sliders[2], 100)
-    duration = Label(fig, @lift(string("Duration: ", $(record_frames.sliders[2].value) / $(record_frames.sliders[1].value), " seconds.")))
-    record_button = Button(fig, label = "Record")
+    duration_fps = GridLayout()
+    duration = Label(fig, @lift(string("Duration: ", round($(record_frames.sliders[2].value) / $(record_frames.sliders[1].value), digits=2), " seconds.")))
+    #cur_fps = Node(NaN)
+    #cur_fps_label = Label(fig, @lift(isnan($cur_fps) ? "" : string(round($cur_fps, digits=2), " fps.")))
+    #duration_fps[:h] = [duration, cur_fps_label]
+    record_layout = GridLayout()
+    record_button = Button(fig, label = "⬤", labelcolor="red")
+    live_toggle = Toggle(fig, active = false)
+    record_layout[:h] = [record_button, Label(fig, "Live"), live_toggle]
 
     t = Node(1)
     dt = 1
-    time = Label(fig, @lift(string($t, "th frame.")))
+    last_frame_time = Node(NaN)
+    time = Label(fig, @lift(string($t, "th frame.", isnan($last_frame_time) ? "" : string(" ", round(inv($last_frame_time), digits=2), " fps."))))
     menu = GridLayout()
-    menu[:v] = [time, display_sl.layout, dynamic_sl.layout, toggles, num_points.layout, resample_button, record_frames.layout, duration, record_button]
+    menu[:v] = [time, display_sl.layout, dynamic_sl.layout, toggles, lib_layout, centering_layout, num_points.layout, resample_button, record_frames.layout, duration, record_layout]
 
     obs_foam = Node{Foam{N,T}}()
     delaunay_edges = Node(zeros(T, 0, 0))
@@ -188,9 +222,15 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     fig[1, 1] = menu
     fig[1, 2] = s
     on(draw, obs_foam)
-    function integ()
+    function _integ()
         t[] += dt
-        obs_foam[] = integrate(obs_foam[], dt, algo, centering, edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
+        obs_foam[] = integrate(obs_foam[], dt, current_library(), current_centering(), edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
+    end
+    function integ()
+        cur_time = @elapsed _integ()
+        @info("New frame computed in $cur_time. Possible fps: $(inv(cur_time))")
+        last_frame_time[] = cur_time
+        return cur_time
     end
     on(events(fig).keyboardbutton) do event
         if event.action in (Keyboard.press, Keyboard.repeat) &&
@@ -222,7 +262,36 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
     scatterfun(s, foam_points, markersize = display_sl.sliders[POINT_SIZE].value, color=ColorSchemes.inferno[0.5])
     scatterfun(s, foam_centers, markersize = display_sl.sliders[CENTER_SIZE].value, color=ColorSchemes.roma[0.65])
 
-
     trim!(fig.layout)
+
+    live = true
+    running = false
+    on(live_toggle.active) do active
+        if active
+            live = true
+            if running
+                @info("Live animation already running")
+            else
+                running = true
+                @async begin
+                    @info("Starting live animation")
+                    while live
+                        cur_time = integ()
+                        target_fps = record_frames.sliders[1].value[]
+                        target_time = inv(target_fps)
+                        if target_time > cur_time
+                            @info("Sleeping for $(target_time - cur_time).")
+                            sleep(target_time - cur_time)
+                        end
+                    end
+                    @info("Stopping live animation")
+                    running = false
+                end
+            end
+        else
+            live = false
+        end
+    end
+
     return fig
 end

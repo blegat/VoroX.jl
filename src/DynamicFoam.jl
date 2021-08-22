@@ -11,6 +11,9 @@ include("rand.jl")
 include("foam.jl")
 include("motion.jl")
 include("plot.jl")
+
+import MiniQhull, QHull, CDDLib, VoronoiDelaunay
+const LIBRARIES = [MiniQhull.delaunay, QHull.Library(), CDDLib.Library(:float), VoronoiDelaunay.DelaunayTessellation2D]
 #include("plotting.jl")
 
 
