@@ -44,6 +44,19 @@ function test_grid_1(lib)
     @test length(foam.num_catched) == length(foam.knots)
 end
 
+# Test failing with VoronoiDelaunay
+# See https://github.com/JuliaGeometry/VoronoiDelaunay.jl/issues/55
+function test_issue_55(lib)
+    points = [
+        SVector(0.0, 0.0),
+        SVector(-0.8, -0.4),
+        SVector( 0.8, -0.2),
+        SVector( 0.0,  0.6),
+    ]
+    foam = DynamicFoam.Foam(points, lib, DynamicFoam.Circumcenter())
+    @test size(foam.voronoi_edges) == (3, 3)
+end
+
 using Random
 function test_random_points(algo)
     Random.seed!(0)
@@ -73,12 +86,20 @@ function test_center()
     @test DynamicFoam.center(points, DynamicFoam.Centroid()) ≈ zeros(3) atol=1e-12
 end
 
-@testset "Grid $lib" for lib in [
+LIBRARIES = [
     CDDLib.Library(:float),
     VoronoiDelaunay.DelaunayTessellation2D,
-    #QHull.Library(),
+    QHull.Library(),
 ]
+
+@testset "Test issue 55 $lib" for lib in LIBRARIES
     if lib != VoronoiDelaunay.DelaunayTessellation2D
+        test_issue_55(lib)
+    end
+end
+
+@testset "Grid $lib" for lib in LIBRARIES
+    if lib != VoronoiDelaunay.DelaunayTessellation2D && !isa(lib, QHull.Library)
         test_grid_0(lib)
     end
     test_grid_1(lib)
