@@ -61,7 +61,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, algo, cente
 
     edge_scale = Toggle(fig, active = true)
     equilibration = Toggle(fig, active = true)
-    contractive = Toggle(fig, active = true)
+    contractive = Toggle(fig, active = false)
     expansive = Toggle(fig, active = true)
     toggles = GridLayout()
     toggles[1, 1] = Label(fig, "Edge scale")
