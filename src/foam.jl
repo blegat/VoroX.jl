@@ -123,6 +123,11 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
             end
         end
     end
+    @assert all(CartesianIndices(simplices)) do facet
+        !iszero(knot_dist[facet]) || any(knots) do knot
+            facet in knot
+        end
+    end
     return Foam(
         points,
         simplices,
