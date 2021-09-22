@@ -14,12 +14,20 @@ function _flat(points::Vector{SVector{N,T}}) where {N,T}
     return m
 end
 
+function shrink(v::VRepresentation, scaling)
+    c = center(points(v), Centroid())
+    return vrep(map(points(v)) do p
+        c + (p - c) * scaling
+    end)
+end
+
 const HEIGHT = 1
 const POINT_SIZE = 2
 const CENTER_SIZE = 3
 const EDGE_WIDTH = 4
 const CIRCUIT_WIDTH = 5
 const DECAY = 6
+const TRANSPARENCY = 7
 
 const WIDTH = 350
 
@@ -33,9 +41,9 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
 
     display_sl = labelslidergrid!(
         fig,
-        ["Height", "Point size", "Center size", "Edge width", "Circuit width", "Decay"],
-        [100:2000, r, r, LinRange(0, 1, 20), LinRange(0.1, 10, 20), LinRange(0, 1, 100)],
-        formats = [x -> "$(round(x, digits = 5))" for _ in 1:6],
+        ["Height", "Point size", "Center size", "Edge width", "Circuit width", "Decay", "Transparency"],
+        [100:2000, r, r, LinRange(0, 1, 20), LinRange(0.1, 10, 20), LinRange(0, 1, 100), LinRange(0.0, 1.0, 21)],
+        formats = [[x -> "$(round(x, digits = 5))" for _ in 1:6]; [x -> "$(round(x, digits = 2))"]],
         width = WIDTH,
         tellheight = true
     )
@@ -46,6 +54,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     set_close_to!(display_sl.sliders[4], 0.5)
     set_close_to!(display_sl.sliders[5], 1)
     set_close_to!(display_sl.sliders[6], 0.9)
+    set_close_to!(display_sl.sliders[TRANSPARENCY], 0.2)
 
     dynamic_sl = labelslidergrid!(
         fig,
@@ -143,6 +152,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     knot_obs = []
     foam_points = Node(SVector{N,T}[])
     foam_centers = Node(SVector{N,T}[])
+    foam_cells = []
     s = LScene(fig, height = display_sl.sliders[HEIGHT].value, scenekw = (show_axis = false,))
 
     function draw(foam)
@@ -217,6 +227,22 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
 
         foam_points[] = foam.points
         foam_centers[] = foam.centers
+
+        for cell in foam_cells
+            delete!(s, cell)
+        end
+        empty!(foam_cells)
+        cell_polyhedra = map(1:size(foam.simplices, 2)) do i
+            vr = vrep(foam.points[foam.simplices[:, i]])
+            return polyhedron(shrink(vr, 0.8))
+        end
+        volumes = Polyhedra.volume.(cell_polyhedra)
+        min_volume, max_volume = extrema(volumes)
+        for i in eachindex(cell_polyhedra)
+            cell_polyhedron = cell_polyhedra[i]
+            ratio = (volumes[i] - min_volume) / (max_volume - min_volume)
+            push!(foam_cells, mesh!(s, Polyhedra.Mesh(cell_polyhedron), color = (ColorSchemes.hsv[ratio], display_sl.sliders[TRANSPARENCY].value)))
+        end
     end
 
     fig[1, 1] = menu

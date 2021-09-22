@@ -66,6 +66,6 @@ function center(points::Vector{SVector{3,T}}, ::Circumcenter) where T
 end
 
 struct Centroid <: AbstractSimplexCenter end
-function center(points::Vector, ::Centroid) where T
+function center(points, ::Centroid) where T
     return sum(points) / length(points)
 end
