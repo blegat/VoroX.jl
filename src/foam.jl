@@ -1,7 +1,3 @@
-using Polyhedra
-import VoronoiDelaunay
-import MiniQhull
-
 # `CartesianIndex(id, simplex_id)` where
 #    id::Int # which facet of the simplex from 1 to `N+1` ?
 #    simplex_id::Int # id of center in `centers` of the `N`-dimensional simplex
@@ -9,7 +5,7 @@ const Facet = CartesianIndex{2}
 
 struct Foam{N,T}
     # Delaunay nodes or Voronoi region/sites
-    points::Vector{SVector{N,T}}
+    points::Union{PeriodicVector{N,T},Vector{SVector{N,T}}}
     # `simplices[:, id]` contains the of the `points` in the simplex `id`.
     simplices::Matrix{Int}
     # Delaunay centers or Voronoi vertices
@@ -44,12 +40,12 @@ function facet_dir(points, simplices, centers, from::Facet, to::Facet)
     return normalize(c2 - c1)
 end
 
-function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) where {N,T}
+function Foam(points::Union{Vector{SVector{N,T}},PeriodicVector{N,T}}, simplices::Matrix{Int}, centering) where {N,T}
     centers = SVector{N,T}[center(points[simplices[:, i]], centering) for i in 1:size(simplices, 2)]
     voronoi_edges = zeros(Facet, size(simplices)...)
     active = Dict{Vector{Int},Facet}()
     for facet in CartesianIndices(simplices)
-        I = sort(setdiff(1:(N+1), facet[1]))
+        I = sort(index.(Ref(points), setdiff(1:(N+1), facet[1])))
         pidx = simplices[I, facet[2]]
         if haskey(active, pidx)
             facet2 = active[pidx]
@@ -142,84 +138,10 @@ function Foam(points::Vector{SVector{N,T}}, simplices::Matrix{Int}, centering) w
     )
 end
 
-function Foam(points::Vector{SVector{N,T}}, algo::Polyhedra.Library, args...) where {N,T}
-    lifted = [SVector(p..., norm(p)^2) for p in points]
-    p = polyhedron(vrep(lifted), algo)
-    _simplices = Vector{Int}[]
-    function add_Δ(vr, vv, vertices_idx, idxmap)
-        @assert length(vertices_idx) == N + 1
-        push!(_simplices, map(1:(N+1)) do j
-            vi = vertices_idx[j]
-            v = get(vr, vi)
-            if v == vv[vi.value]
-                i = vi.value
-            else
-                i = findfirst(isequal(v), vv)
-            end
-            idxmap[i]
-        end)
-    end
-    for hi in Polyhedra.Indices{T,Polyhedra.halfspacetype(p)}(p)
-        h = get(p, hi)
-        if Polyhedra._neg(h.a[end])
-            vertices_idx = incidentpointindices(p, hi)
-            @assert length(vertices_idx) >= N + 1
-            if length(vertices_idx) == N + 1
-                add_Δ(p, lifted, vertices_idx, eachindex(lifted))
-            else
-                idx = map(vertices_idx) do vi
-                    @assert get(p, vi) == lifted[vi.value]
-                    vi.value
-                end
-                vv = points[idx]
-                vr = polyhedron(vrep(vv), algo)
-                for Δ in triangulation_indices(vr)
-                    add_Δ(vr, vv, Δ, idx)
-                end
-            end
-        end
-    end
-    simplices = Matrix{Int}(undef, N+1, length(_simplices))
-    for (i, Δ) in enumerate(_simplices)
-        simplices[:, i] = Δ
-    end
-    return Foam(points, simplices, args...)
-end
+periodify(points, ::NonPeriodic) = points
+periodify(points, p::Periodic) = PeriodicVector(points, p.period)
 
-function Foam(points::Vector{SVector{2,T}}, algo::Type{<:VoronoiDelaunay.DelaunayTessellation2D}, args...) where {T}
-    tess = VoronoiDelaunay.DelaunayTessellation(length(points))
-    # VoronoiDelaunay currently needs the points to be between 1 + ε and 2 - 2ε
-    a = reduce((a, b) -> min.(a, b), points, init=SVector(Inf, Inf))
-    b = reduce((a, b) -> max.(a, b), points, init=SVector(-Inf, -Inf))
-    width = b .- a
-    scaled = map(points) do p
-        # Multipltiply by 1.0001 to be sure to be in [1 + ε, 2 - 2ε]
-        x = (p .- a) ./ (width * (1 + 1e-4)) .+ (1 + 1e-6)
-        for c in x
-            if !(1 + eps(Float64) < c < 2 - 2eps(Float64))
-                error("Point $p was mapped to $c for which the coordonate $x is not in the interval [$(1 + eps(Float64)), $(2 - 2eps(Float64)))]")
-            end
-        end
-        return VoronoiDelaunay.Point2D(x...)
-    end
-    # Should construct before as `tess` modifies `scaled`.
-    back = Dict(p => i for (i, p) in enumerate(scaled))
-    push!(tess, scaled)
-    Δs = VoronoiDelaunay.DelaunayTriangle{VoronoiDelaunay.GeometricalPredicates.Point2D}[]
-    # Cannot collect as it does not implement length nor IteratorSize
-    for Δ in tess
-        push!(Δs, Δ)
-    end
-    simplices = Matrix{Int}(undef, 3, length(Δs))
-    for (i, Δ) in enumerate(Δs)
-        simplices[1, i] = back[VoronoiDelaunay.geta(Δ)]
-        simplices[2, i] = back[VoronoiDelaunay.getb(Δ)]
-        simplices[3, i] = back[VoronoiDelaunay.getc(Δ)]
-    end
-    return Foam(points, simplices, args...)
-end
-
-function Foam(points::Vector{SVector{N,T}}, algo::typeof(MiniQhull.delaunay), args...) where {N,T}
-    simplices = MiniQhull.delaunay(points)
-    return Foam(points, convert(Matrix{Int}, simplices), args...)
+function Foam(points::Vector{SVector{N,T}}, algo, periodic::Union{NonPeriodic,Periodic}, args...) where {N,T}
+    simplices = delaunay(points, algo, periodic)
+    return Foam(periodify(points, periodic), convert(Matrix{Int}, simplices), args...)
 end

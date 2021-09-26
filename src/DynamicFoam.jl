@@ -8,6 +8,8 @@ import ColorSchemes
 include("center.jl")
 include("nearest_neighbors.jl")
 include("rand.jl")
+include("periodic.jl")
+include("delaunay.jl")
 include("foam.jl")
 include("motion.jl")
 include("plot.jl")

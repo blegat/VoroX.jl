@@ -1,5 +1,5 @@
 function markersize_range(::typeof(scatter!), r)
-    return LinRange(r / 10, 10r, 20), 1r
+    return LinRange(r / 10, 40r, 40), 1r
 end
 function markersize_range(::typeof(meshscatter!), r)
     return LinRange(r / 10000, r / 100, 20), r / 200
@@ -34,7 +34,64 @@ const WIDTH = 350
 const ENERGY = 1
 const SCALE = 2
 
+function clip_point(p, dir, min_coords, max_coords::SVector{N}) where {N}
+    for i in 1:N
+        if p[i] < min_coords[i]
+            p = p + dir * (min_coords[i] - p[i]) / dir[i]
+        end
+        if p[i] > max_coords[i]
+            p = p + dir * (max_coords[i] - p[i]) / dir[i]
+        end
+    end
+    return p
+end
+
+function _shift(f, p::SVector{N}, min_coords::SVector{N}, max_coords::SVector{N}) where {N}
+    return ntuple(Val(N)) do i
+        if f(p[i], min_coords[i])
+            return 1
+        elseif f(max_coords[i], p[i])
+            return -1
+        else
+            return 0
+        end
+    end
+end
+
+_points(v::Vector) = v
+_points(v::PeriodicVector) = v.points
+
+function clipped_edge(from, to, min_coords, max_coords::SVector{N}) where {N}
+    shift = _shift(<, from, min_coords, max_coords)
+    @show from
+    @show to
+    @show shift
+    period = max_coords - min_coords
+    from = shift_point(from, shift, period)
+    to = shift_point(to, shift, period)
+    out = [from]
+    for i in 1:3
+        if all(iszero, _shift(<, to, min_coords, max_coords))
+            break
+        end
+        mid = clip_point(to, from - to, min_coords, max_coords)
+        push!(out, mid)
+        shift = _shift(≈, mid, min_coords, max_coords)
+        @show mid
+        @show shift
+        from = shift_point(mid, shift, period)
+        to = shift_point(to, shift, period)
+        push!(out, from)
+    end
+    if !all(iszero, _shift(<, to, min_coords, max_coords))
+        error("$from, $to")
+    end
+    push!(out, to)
+    return out
+end
+
 function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=scatter!, args...) where {N,T}
+    _periodic(is_periodic) = is_periodic ? Periodic(max_coords - min_coords) : NonPeriodic()
     set_theme!(backgroundcolor = ColorSchemes.tableau_red_black[end])
     fig = Figure(resolution = (1200, 1200))
     r, start = markersize_range(scatterfun, norm(max_coords - min_coords))
@@ -54,7 +111,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     set_close_to!(display_sl.sliders[4], 0.5)
     set_close_to!(display_sl.sliders[5], 1)
     set_close_to!(display_sl.sliders[6], 0.9)
-    set_close_to!(display_sl.sliders[TRANSPARENCY], 0.2)
+    set_close_to!(display_sl.sliders[TRANSPARENCY], 0.0)
 
     dynamic_sl = labelslidergrid!(
         fig,
@@ -72,6 +129,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     equilibration = Toggle(fig, active = true)
     contractive = Toggle(fig, active = false)
     expansive = Toggle(fig, active = true)
+    periodic = Toggle(fig, active = true)
     toggles = GridLayout()
     toggles[1, 1] = Label(fig, "Edge scale")
     toggles[1, 2] = edge_scale
@@ -81,6 +139,11 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     toggles[2, 2] = contractive
     toggles[2, 3] = Label(fig, "Expansive")
     toggles[2, 4] = expansive
+    toggles[3, 1] = Label(fig, "Periodic")
+    toggles[3, 2] = periodic
+    on(periodic.active) do a
+        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(a), current_centering())
+    end
 
     lib_layout = GridLayout()
     lib = Menu(fig, options = ["MiniQhull", "Qhull", "CDDLib", "VoronoiDelaunay"])
@@ -88,7 +151,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     lib_layout[:h] = [Label(fig, "Library"), lib]
     current_library() = LIBRARIES[lib.i_selected[]]
     on(lib.selection) do s
-        obs_foam[] = Foam(obs_foam[].points, current_library(), current_centering())
+        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering())
     end
 
     centering_layout = GridLayout()
@@ -104,7 +167,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
         end
     end
     on(centering.selection) do s
-        obs_foam[] = Foam(obs_foam[].points, current_library(), current_centering())
+        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering())
     end
 
     num_points = labelslider!(fig, "Number of points", N:1000, format = x -> string(x), width=WIDTH, tellheight = true)
@@ -114,7 +177,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     function resample(n)
         points = random_points(num_points.slider.value[], min_coords, max_coords, args...)
         t[] = 1
-        obs_foam[] = Foam(points, current_library(), current_centering())
+        obs_foam[] = Foam(points, current_library(), _periodic(periodic.active[]), current_centering())
     end
 
     on(resample, resample_button.clicks)
@@ -156,20 +219,17 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     s = LScene(fig, height = display_sl.sliders[HEIGHT].value, scenekw = (show_axis = false,))
 
     function draw(foam)
-        points = SVector{N,T}[]
+        delaunay_edges_points = SVector{N,T}[]
         for simplex in 1:size(foam.simplices, 2)
             for i in 1:size(foam.simplices, 1)
                 for j in 1:(i-1)
                     from = foam.simplices[i, simplex]
                     to = foam.simplices[j, simplex]
-                    a = foam.points[from]
-                    b = foam.points[to]
-                    push!(points, a)
-                    push!(points, b)
+                    append!(delaunay_edges_points, clipped_edge(foam.points[from], foam.points[to], min_coords, max_coords))
                 end
             end
         end
-        delaunay_edges[] = _flat(points)
+        delaunay_edges[] = _flat(delaunay_edges_points)
 
         dists = Int[]
         out_knot_edges = Dict()
@@ -177,14 +237,10 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
             d = foam.knot_dist[facet]
             next = foam.voronoi_edges[facet]
             if d > 0 && !iszero(next)
-                a = foam.centers[facet[2]]
-                b = foam.centers[next[2]]
-                if haskey(out_knot_edges, d)
-                    push!(out_knot_edges[d], a)
-                    push!(out_knot_edges[d], b)
-                else
-                    out_knot_edges[d] = [a, b]
-                end
+                append!(
+                    get!(out_knot_edges, d, SVector{N,T}[]),
+                    clipped_edge(foam.centers[facet[2]], foam.centers[next[2]], min_coords, max_coords),
+                )
             end
         end
         for d in keys(out_knot_edges_obs)
@@ -210,8 +266,11 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
                 @assert iszero(foam.knot_dist[facet])
             end
             c = foam.centers[getindex.(knot, 2)]
-            push!(c, c[1])
-            m = _flat(c)
+            d = SVector{N,T}[]
+            for i in eachindex(c)
+                append!(d, clipped_edge(c[i], c[mod1(i + 1, length(c))], min_coords, max_coords))
+            end
+            m = _flat(d)
             i += 1
             if i > length(knot_obs)
                 obs = Node(m)
@@ -225,23 +284,38 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
             knot_obs[j][] = zeros(T, N, 0)
         end
 
-        foam_points[] = foam.points
+        foam_points[] = _points(foam.points)
         foam_centers[] = foam.centers
 
         for cell in foam_cells
             delete!(s, cell)
         end
         empty!(foam_cells)
-        cell_polyhedra = map(1:size(foam.simplices, 2)) do i
-            vr = vrep(foam.points[foam.simplices[:, i]])
-            return polyhedron(shrink(vr, 0.8))
-        end
-        volumes = Polyhedra.volume.(cell_polyhedra)
-        min_volume, max_volume = extrema(volumes)
-        for i in eachindex(cell_polyhedra)
-            cell_polyhedron = cell_polyhedra[i]
-            ratio = (volumes[i] - min_volume) / (max_volume - min_volume)
-            push!(foam_cells, mesh!(s, Polyhedra.Mesh(cell_polyhedron), color = (ColorSchemes.hsv[ratio], display_sl.sliders[TRANSPARENCY].value)))
+        if display_sl.sliders[TRANSPARENCY].value[] > 0
+            if periodic.active[]
+                cube = reduce(*, [HalfSpace(SVector(one(T)), max_coords[i]) ∩ HalfSpace(SVector(-one(T)), -min_coords[i]) for i in 1:N])
+            else
+                cube = nothing
+            end
+            cell_polyhedra = map(1:size(foam.simplices, 2)) do i
+                vr = vrep(foam.points[foam.simplices[:, i]])
+                #p = polyhedron(shrink(vr, 0.8))
+                p = polyhedron(vr)
+                if cube !== nothing
+                    p = p ∩ cube
+                end
+                return p
+            end
+            volumes = Polyhedra.volume.(cell_polyhedra)
+            I = (!iszero).(volumes)
+            cell_polyhedra = cell_polyhedra[I]
+            volumes = volumes[I]
+            min_volume, max_volume = extrema(volumes)
+            for i in eachindex(cell_polyhedra)
+                cell_polyhedron = cell_polyhedra[i]
+                ratio = (volumes[i] - min_volume) / (max_volume - min_volume)
+                push!(foam_cells, mesh!(s, Polyhedra.Mesh(cell_polyhedron), color = (ColorSchemes.hsv[ratio], display_sl.sliders[TRANSPARENCY].value)))
+            end
         end
     end
 
