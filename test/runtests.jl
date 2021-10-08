@@ -9,7 +9,7 @@ include("../src/DynamicFoam.jl")
 
 function _test_grid(n, lib)
     points = [SVector{2,Float64}(x, y) for x in -n:n for y in -n:n]
-    return DynamicFoam.Foam(points, lib, DynamicFoam.Circumcenter())
+    return DynamicFoam.Foam(points, lib, DynamicFoam.NonPeriodic(), DynamicFoam.Circumcenter())
 end
 
 function test_grid_0(lib)
@@ -54,14 +54,14 @@ function test_issue_55(lib)
         SVector( 0.8, -0.2),
         SVector( 0.0,  0.6),
     ]
-    foam = DynamicFoam.Foam(points, lib, DynamicFoam.Circumcenter())
+    foam = DynamicFoam.Foam(points, lib, DynamicFoam.NonPeriodic(), DynamicFoam.Circumcenter())
     @test size(foam.voronoi_edges) == (3, 3)
 end
 
 using Random
-function test_random_points(algo)
+function test_random_points(lib)
     Random.seed!(0)
-    points = DynamicFoam.random_points(10, SVector(-1.0, -1.0), SVector(1.0, 1.0), algo)
+    points = DynamicFoam.random_points(10, SVector(-1.0, -1.0), SVector(1.0, 1.0), lib)
     @test points ≈ [
         [ 0.0,          0.0],
         [ 0.670087346,  0.153600819],
@@ -85,6 +85,34 @@ function test_center()
     ]
     @test DynamicFoam.center(points, DynamicFoam.Circumcenter()) ≈ zeros(3) atol=1e-12
     @test DynamicFoam.center(points, DynamicFoam.Centroid()) ≈ zeros(3) atol=1e-12
+end
+
+function hascol(A, cols)
+    for col in cols
+        sort!(col)
+        for i in 1:size(A, 2)
+            if col == sort(A[:, i])
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function test_periodic(algo)
+    points = [
+        SVector( 1/4,  1/2),
+        SVector(-1/2, -1/2),
+        SVector( 1/2, -1/2),
+    ]
+    d = DynamicFoam.delaunay(points, algo, DynamicFoam.Periodic(SVector(2.0, 2.0)))
+    @test size(d) == (3, 6)
+    @test hascol(d, [[13, 14, 15]])
+    @test hascol(d, [[4, 14, 15], [13, 23, 24]])
+    @test hascol(d, [[13, 15, 17], [10, 12, 14]])
+    @test hascol(d, [[4, 15, 17], [1, 12, 14], [13, 24, 26]])
+    @test hascol(d, [[10, 13, 23], [13, 16, 26], [1, 4, 14]])
+    @test hascol(d, [[10, 13, 14], [13, 16, 17]])
 end
 
 LIBRARIES = DynamicFoam.LIBRARIES
@@ -112,4 +140,8 @@ end
 
 @testset "center" begin
     test_center()
+end
+
+@testset "periodic" for lib in LIBRARIES
+    test_periodic(lib)
 end

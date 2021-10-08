@@ -89,24 +89,31 @@ function delaunay(points::Vector{SVector{N,T}}, algo::typeof(MiniQhull.delaunay)
 end
 
 function delaunay(points::Vector{SVector{N,T}}, algo, p::Periodic{N,T}) where {N,T}
-    display(points)
-    display(all_shift(points, p.period))
+    pp = all_shift(points, p.period)
     simplices = delaunay(all_shift(points, p.period), algo, NonPeriodic())
-    display(simplices)
-    selected = Dict{Vector{eltype(simplices)},Int}()
-    function score(simplex)
-        count(id_shift.(simplex, length(points), Val(N))) do shift
-            @assert all(i -> -1 <= i <= 1, shift)
-            all(iszero, shift)
-        end
-    end
+    selected = Dict{Tuple{Vector{eltype(simplices)},Vector{NTuple{N,Int}}},Int}()
+#    function score(simplex)
+#        count(id_shift.(simplex, length(points), Val(N))) do shift
+#            @assert all(i -> -1 <= i <= 1, shift)
+#            all(iszero, shift)
+#        end
+#    end
     for j in 1:size(simplices, 2)
         s = simplices[:, j]
+        sort!(s)
         id = mod1.(s, length(points))
-        if !haskey(selected, id) || score(s) > score(simplices[:, selected[id]])
-            selected[id] = j
+        id_shifts = id_shift.(s, length(points), Val(N))
+        if !any(shift -> all(iszero, shift), id_shifts)
+            continue
+        end
+        root = id_shifts[1]
+        id_shifts = map(id_shifts) do shift
+            shift .- root
+        end
+        key = (id, id_shifts)
+        if !haskey(selected, key)
+            selected[key] = j
         end
     end
-    display(selected)
     return simplices[:, collect(values(selected))]
 end
