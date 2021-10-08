@@ -63,9 +63,6 @@ _points(v::PeriodicVector) = v.points
 
 function clipped_edge(from, to, min_coords, max_coords::SVector{N}) where {N}
     shift = _shift(<, from, min_coords, max_coords)
-    @show from
-    @show to
-    @show shift
     period = max_coords - min_coords
     from = shift_point(from, shift, period)
     to = shift_point(to, shift, period)
@@ -77,8 +74,6 @@ function clipped_edge(from, to, min_coords, max_coords::SVector{N}) where {N}
         mid = clip_point(to, from - to, min_coords, max_coords)
         push!(out, mid)
         shift = _shift(≈, mid, min_coords, max_coords)
-        @show mid
-        @show shift
         from = shift_point(mid, shift, period)
         to = shift_point(to, shift, period)
         push!(out, from)
@@ -111,7 +106,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     set_close_to!(display_sl.sliders[4], 0.5)
     set_close_to!(display_sl.sliders[5], 1)
     set_close_to!(display_sl.sliders[6], 0.9)
-    set_close_to!(display_sl.sliders[TRANSPARENCY], 0.0)
+    set_close_to!(display_sl.sliders[TRANSPARENCY], 0.4)
 
     dynamic_sl = labelslidergrid!(
         fig,
@@ -297,8 +292,25 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
             else
                 cube = nothing
             end
-            cell_polyhedra = map(1:size(foam.simplices, 2)) do i
-                vr = vrep(foam.points[foam.simplices[:, i]])
+            cell_points = Vector{SVector{N,T}}[]
+            for i in 1:size(foam.simplices, 2)
+                simplex = foam.simplices[:, i]
+                ps = foam.points[simplex]
+                push!(cell_points, ps)
+                if foam.points isa PeriodicVector
+                    done = Set([ntuple(_ -> 0, Val(N))])
+                    period = max_coords - min_coords
+                    for id in simplex
+                        shift = id_shift(id, length(foam.points.points), Val(N))
+                        if !(shift in done)
+                            push!(cell_points, [shift_point(p, map(-, shift), period) for p in ps])
+                            push!(done, shift)
+                        end
+                    end
+                end
+            end
+            cell_polyhedra = map(cell_points) do cell_p
+                vr = vrep(cell_p)
                 #p = polyhedron(shrink(vr, 0.8))
                 p = polyhedron(vr)
                 if cube !== nothing
