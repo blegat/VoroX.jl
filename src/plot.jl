@@ -287,46 +287,48 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
         end
         empty!(foam_cells)
         if display_sl.sliders[TRANSPARENCY].value[] > 0
-            if periodic.active[]
+            if foam.points isa PeriodicVector
                 cube = reduce(*, [HalfSpace(SVector(one(T)), max_coords[i]) ∩ HalfSpace(SVector(-one(T)), -min_coords[i]) for i in 1:N])
             else
                 cube = nothing
             end
-            cell_points = Vector{SVector{N,T}}[]
+            cell_points = Tuple{Vector{SVector{N,T}},Float64}[]
             for i in 1:size(foam.simplices, 2)
                 simplex = foam.simplices[:, i]
                 ps = foam.points[simplex]
-                push!(cell_points, ps)
+                catchment = simplex_catchment(foam, i)
+                push!(cell_points, (ps, catchment))
                 if foam.points isa PeriodicVector
-                    done = Set([ntuple(_ -> 0, Val(N))])
                     period = max_coords - min_coords
-                    for id in simplex
-                        shift = id_shift(id, length(foam.points.points), Val(N))
-                        if !(shift in done)
-                            push!(cell_points, [shift_point(p, map(-, shift), period) for p in ps])
-                            push!(done, shift)
-                        end
+                    for shift in Iterators.product(ntuple(_ -> -1:1, Val(N))...)
+                        push!(cell_points, ([shift_point(p, map(-, shift), period) for p in ps], catchment))
                     end
                 end
             end
-            cell_polyhedra = map(cell_points) do cell_p
+            cell_polyhedra = map(cell_points) do (cell_p, catchment)
                 vr = vrep(cell_p)
                 #p = polyhedron(shrink(vr, 0.8))
                 p = polyhedron(vr)
                 if cube !== nothing
                     p = p ∩ cube
                 end
-                return p
+                return p, catchment
             end
-            volumes = Polyhedra.volume.(cell_polyhedra)
-            I = (!iszero).(volumes)
-            cell_polyhedra = cell_polyhedra[I]
-            volumes = volumes[I]
-            min_volume, max_volume = extrema(volumes)
+            if foam.points isa PeriodicVector
+                filter!(cell_polyhedra) do (p, _)
+                    Polyhedra.computevrep!(p)
+                    !isempty(p)
+                end
+            end
+            #volumes = Polyhedra.volume.(cell_polyhedra)
+            #min_volume, max_volume = extrema(volumes)
             for i in eachindex(cell_polyhedra)
-                cell_polyhedron = cell_polyhedra[i]
-                ratio = (volumes[i] - min_volume) / (max_volume - min_volume)
-                push!(foam_cells, mesh!(s, Polyhedra.Mesh(cell_polyhedron), color = (ColorSchemes.hsv[ratio], display_sl.sliders[TRANSPARENCY].value)))
+                cell_polyhedron, catchment = cell_polyhedra[i]
+                ratio = sqrt(min(catchment, 1))
+                #ratio = (volumes[i] - min_volume) / (max_volume - min_volume)
+                #scheme = ColorSchemes.hsv
+                scheme = ColorSchemes.coolwarm
+                push!(foam_cells, mesh!(s, Polyhedra.Mesh(cell_polyhedron), color = (scheme[ratio], @lift($(display_sl.sliders[TRANSPARENCY].value) * (1 - ratio) + ratio))))
             end
         end
     end
@@ -336,7 +338,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     on(draw, obs_foam)
     function _integ()
         t[] += dt
-        obs_foam[] = integrate(obs_foam[], dt, current_library(), current_centering(), edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
+        obs_foam[] = integrate(obs_foam[], dt, current_library(), _periodic(periodic.active[]), current_centering(), edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
     end
     function integ()
         cur_time = @elapsed _integ()

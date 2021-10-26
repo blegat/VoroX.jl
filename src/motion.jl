@@ -11,20 +11,24 @@ function homothety(Δ, catchment, scale, energy, equilibration::Bool, contractiv
     end
     return energy * Δ * h
 end
-function gradient(foam::Foam{N,T}, edge_scale::Bool, args...) where {N,T}
-    ∇ = [zero(SVector{N,T}) for i in eachindex(foam.points)]
-    for simplex in 1:size(foam.simplices, 2)
-        catchment = 0.0
-        for id in 1:size(foam.simplices, 1)
-            facet = Facet(id, simplex)
-            if iszero(foam.knot_dist[facet])
-                k = foam.facet_knot[facet]
-                l = length(foam.knots[k])
-                catchment += (l + foam.num_catched[k]) / l
-            end
+function simplex_catchment(foam, simplex)
+    catchment = 0.0
+    for id in 1:size(foam.simplices, 1)
+        facet = Facet(id, simplex)
+        if iszero(foam.knot_dist[facet])
+            k = foam.facet_knot[facet]
+            l = length(foam.knots[k])
+            catchment += (l + foam.num_catched[k]) / l
         end
-        catchment /= size(foam.simplices, 1)
-        pidxs = foam.simplices[:,simplex]
+    end
+    catchment /= size(foam.simplices, 1)
+    return catchment
+end
+function gradient(foam::Foam{N,T}, edge_scale::Bool, args...) where {N,T}
+    ∇ = [zero(SVector{N,T}) for i in eachindex(_points(foam.points))]
+    for simplex in 1:size(foam.simplices, 2)
+        catchment = simplex_catchment(foam, simplex)
+        pidxs = index.(Ref(foam.points), foam.simplices[:,simplex])
         ps = foam.points[pidxs]
         c = center(ps, Centroid())
         for (pidx, p) in zip(pidxs, ps)
@@ -43,8 +47,8 @@ function gradient(foam::Foam{N,T}, edge_scale::Bool, args...) where {N,T}
     return ∇
 end
 
-function integrate(foam, dt, algo, centering, args...)
+function integrate(foam, dt, algo, periodic, centering, args...)
     g = gradient(foam, args...)
-    points = foam.points .+ dt * g
-    return Foam(points, algo, centering)
+    points = _points(foam.points) .+ dt * g
+    return Foam(points, algo, periodic, centering)
 end
