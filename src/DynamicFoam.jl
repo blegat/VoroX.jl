@@ -1,5 +1,7 @@
 module DynamicFoam
 
+export foam
+
 using LinearAlgebra
 using GLMakie, StaticArrays
 import ProgressMeter

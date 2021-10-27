@@ -409,3 +409,8 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
 
     return fig
 end
+
+
+function foam(K::Int, N::Int, args...)
+    main(K, SVector(ntuple(_ -> -1.0, Val(N))), SVector(ntuple(_ -> 1.0, Val(N))))
+end
