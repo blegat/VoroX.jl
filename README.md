@@ -29,6 +29,8 @@ Now install its dependencies as follows:
 The installation should take a while.
 Once this is done, to launch the software with `K` points and `N` dimensions, do
 ```julia
+julia> using DynamicFoam
+
 julia> foam(K, N)
 ```
 Note that `N` can only be 2 or 3.
