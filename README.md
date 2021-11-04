@@ -2,6 +2,13 @@
 
 Generalizes [DynamicFoam](https://github.com/weigert/DynamicFoam) to 3D.
 
+## Settings
+
+Comparing to [DynamicFoam](https://github.com/weigert/DynamicFoam):
+* The criticality used is equivalent to an infinite criticality and cannot be changed.
+* If "Edge scale" is on, the dynamics is equivalent to [DynamicFoam](https://github.com/weigert/DynamicFoam): it scales the edges. If it is off, it scales delaunay simplices.
+* The "Height" setting changes the height of the rendering frame but does not influence the dynamics. The points are are samples in a fixed square or cube that cannot be changed.
+
 ## Installation
 
 Download this repository. Let `path/to/DynamicFoam` be the directory where this package was decompressed.
@@ -39,7 +46,7 @@ For instance, for 10 points in 3D, do:
 julia> foam(10, 3)
 ```
 
-## Troubleshooting
+### Troubleshooting
 
 On Arch Linux, linux should be launched as follows:
 ```julia
