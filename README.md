@@ -24,6 +24,8 @@ julia> foam(K, N)
 ```
 If the program is run again with the same seed (1234 here), it will produce exactly the same simulations.
 
+The issue can be reported by [opening an issue](https://github.com/blegat/DynamicFoam.jl/issues/new/choose).
+
 ## Installation
 
 Download this repository. Let `path/to/DynamicFoam` be the directory where this package was decompressed.
