@@ -40,7 +40,37 @@ function facet_dir(points, simplices, centers, from::Facet, to::Facet)
     return normalize(c2 - c1)
 end
 
-function Foam(points::Union{Vector{SVector{N,T}},PeriodicVector{N,T}}, simplices::Matrix{Int}, centering) where {N,T}
+# Coordinate to the shift it is at
+function coord_shift(a, min, max)
+    return a < min ? -1 : (a > max ? 1 : 0)
+end
+function point_shift(point::SVector, min_coords::SVector, max_coords::SVector)
+    return coord_shift.(point, min_coords, max_coords)
+end
+
+function Foam(points::Union{Vector{SVector{N,T}},PeriodicVector{N,T}}, simplices::Matrix{Int}, centering, args...) where {N,T}
+    centers = SVector{N,T}[]
+    for i in 1:size(simplices, 2)
+        c = center(points[simplices[:, i]], centering)
+        if points isa PeriodicVector
+            shift = point_shift(c, args...)
+            # If the centers is outside the box,
+            # we consider a different shift of the simplex so that
+            # the center is inside the box
+            if !all(iszero, shift)
+                for j in 1:size(simplices, 1)
+                    id = simplices[j, i]
+                    new_shift = tuple((id_shift(id, points) .- shift)...)
+                    @assert all(k -> -1 <= k <= 1, new_shift)
+                    simplices[j, i] = shift_range(new_shift, length(points.points))[index(points, id)]
+                end
+                c = center(points[simplices[:, i]], centering)
+                shift = point_shift(c, args...)
+                @assert all(iszero, shift)
+            end
+        end
+        push!(centers, c)
+    end
     centers = SVector{N,T}[center(points[simplices[:, i]], centering) for i in 1:size(simplices, 2)]
     voronoi_edges = zeros(Facet, size(simplices)...)
     active = Dict{Vector{Int},Facet}()

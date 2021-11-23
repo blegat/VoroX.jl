@@ -137,7 +137,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     toggles[3, 1] = Label(fig, "Periodic")
     toggles[3, 2] = periodic
     on(periodic.active) do a
-        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(a), current_centering())
+        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(a), current_centering(), min_coords, max_coords)
     end
 
     lib_layout = GridLayout()
@@ -146,7 +146,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     lib_layout[:h] = [Label(fig, "Library"), lib]
     current_library() = LIBRARIES[lib.i_selected[]]
     on(lib.selection) do s
-        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering())
+        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering(), min_coords, max_coords)
     end
 
     centering_layout = GridLayout()
@@ -162,7 +162,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
         end
     end
     on(centering.selection) do s
-        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering())
+        obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering(), min_coords, max_coords)
     end
 
     num_points = labelslider!(fig, "Number of points", N:1000, format = x -> string(x), width=WIDTH, tellheight = true)
@@ -172,7 +172,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     function resample(n)
         points = random_points(num_points.slider.value[], min_coords, max_coords, args...)
         t[] = 1
-        obs_foam[] = Foam(points, current_library(), _periodic(periodic.active[]), current_centering())
+        obs_foam[] = Foam(points, current_library(), _periodic(periodic.active[]), current_centering(), min_coords, max_coords)
     end
 
     on(resample, resample_button.clicks)

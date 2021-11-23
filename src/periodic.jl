@@ -5,8 +5,8 @@ end
 
 index(::Vector, i) = i
 index(v::PeriodicVector, i) = mod1(i, length(v.points))
-function Base.getindex(v::PeriodicVector{N}, i::Integer) where {N}
-    return shift_point(v.points[index(v, i)], id_shift(i, length(v.points), Val(N)), v.period)
+function Base.getindex(v::PeriodicVector, i::Integer)
+    return shift_point(v.points[index(v, i)], id_shift(i, v), v.period)
 end
 Base.getindex(v::PeriodicVector, i::Vector) = getindex.(Ref(v), i)
 
@@ -35,4 +35,7 @@ function id_shift(id, t::Tuple)
 end
 function id_shift(id, n, l::Val)
     return id_shift(div(id - 1, n), ntuple(_ -> nothing, l))
+end
+function id_shift(id, p::PeriodicVector{N}) where {N}
+    return id_shift(id, length(p.points), Val(N))
 end
