@@ -47,8 +47,8 @@ function gradient(foam::Foam{N,T}, edge_scale::Bool, args...) where {N,T}
     return ∇
 end
 
-function integrate(foam, dt, algo, periodic, centering, args...)
+function integrate(foam, dt, algo, periodic, centering, min_coords, max_coords, args...)
     g = gradient(foam, args...)
     points = _points(foam.points) .+ dt * g
-    return Foam(points, algo, periodic, centering)
+    return Foam(points, algo, periodic, centering, min_coords, max_coords)
 end

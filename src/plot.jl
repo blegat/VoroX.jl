@@ -338,7 +338,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     on(draw, obs_foam)
     function _integ()
         t[] += dt
-        obs_foam[] = integrate(obs_foam[], dt, current_library(), _periodic(periodic.active[]), current_centering(), edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
+        obs_foam[] = integrate(obs_foam[], dt, current_library(), _periodic(periodic.active[]), current_centering(), min_coords, max_coords, edge_scale.active[], dynamic_sl.sliders[SCALE].value[], dynamic_sl.sliders[ENERGY].value[], equilibration.active[], contractive.active[], expansive.active[])
     end
     function integ()
         cur_time = @elapsed _integ()
