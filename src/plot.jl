@@ -125,6 +125,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     contractive = Toggle(fig, active = false)
     expansive = Toggle(fig, active = true)
     periodic = Toggle(fig, active = true)
+    shading = Toggle(fig, active = true)
     toggles = GridLayout()
     toggles[1, 1] = Label(fig, "Edge scale")
     toggles[1, 2] = edge_scale
@@ -136,6 +137,8 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     toggles[2, 4] = expansive
     toggles[3, 1] = Label(fig, "Periodic")
     toggles[3, 2] = periodic
+    toggles[3, 3] = Label(fig, "Voro shading")
+    toggles[3, 4] = shading
     on(periodic.active) do a
         obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(a), current_centering(), min_coords, max_coords)
     end
@@ -293,15 +296,43 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
                 cube = nothing
             end
             cell_points = Tuple{Vector{SVector{N,T}},Float64}[]
-            for i in 1:size(foam.simplices, 2)
-                simplex = foam.simplices[:, i]
-                ps = foam.points[simplex]
-                catchment = simplex_catchment(foam, i)
-                push!(cell_points, (ps, catchment))
-                if foam.points isa PeriodicVector
-                    period = max_coords - min_coords
+            if shading.active[]
+                for i in 1:length(_points(foam.points))
+                    simplices = filter(1:size(foam.simplices, 2)) do simplex
+                        any(1:size(foam.simplices, 1)) do k
+                            index(foam.points, foam.simplices[k, simplex]) == i
+                        end
+                    end
+                    ps = map(simplices) do simplex
+                        k = findfirst(1:size(foam.simplices, 1)) do k
+                            index(foam.points, foam.simplices[k, simplex]) == i
+                        end
+                        center = foam.centers[simplex]
+                        if foam.points isa PeriodicVector
+                            shift = id_shift(foam.simplices[k, simplex], foam.points)
+                            center = shift_point(center, (-).(shift), max_coords .- min_coords)
+                        end
+                        return center
+                    end
+                    catchment = sum(simplex_catchment(foam, simplex) for simplex in simplices) / length(simplices)
+                    push!(cell_points, (ps, catchment))
+                end
+            else
+                for i in 1:size(foam.simplices, 2)
+                    simplex = foam.simplices[:, i]
+                    ps = foam.points[simplex]
+                    catchment = simplex_catchment(foam, i)
+                    push!(cell_points, (ps, catchment))
+                end
+            end
+            if foam.points isa PeriodicVector
+                period = max_coords - min_coords
+                for i in 1:length(cell_points)
+                    ps, catchment = cell_points[i]
                     for shift in Iterators.product(ntuple(_ -> -1:1, Val(N))...)
-                        push!(cell_points, ([shift_point(p, map(-, shift), period) for p in ps], catchment))
+                        if !all(iszero, shift)
+                            push!(cell_points, ([shift_point(p, map(-, shift), period) for p in ps], catchment))
+                        end
                     end
                 end
             end
