@@ -1,4 +1,4 @@
-# DynamicFoam.jl
+# Voro-X
 
 Generalizes [DynamicFoam](https://github.com/weigert/DynamicFoam) to 3D.
 
@@ -14,7 +14,7 @@ Comparing to [DynamicFoam](https://github.com/weigert/DynamicFoam):
 As the software use randomness. Running it twice give different results.
 To make things reproducible, you can fix the seed as follows where 1234 can be replaced by any number:
 ```julia
-julia> using DynamicFoam
+julia> using VoroX
 
 julia> using Random
 
@@ -24,11 +24,11 @@ julia> foam(K, N)
 ```
 If the program is run again with the same seed (1234 here), it will produce exactly the same simulations.
 
-The issue can be reported by [opening an issue](https://github.com/blegat/DynamicFoam.jl/issues/new/choose).
+The issue can be reported by [opening an issue](https://github.com/blegat/VoroX.jl/issues/new/choose).
 
 ## Installation
 
-Download this repository. Let `path/to/DynamicFoam` be the directory where this package was decompressed.
+Download this repository. Let `path/to/VoroX` be the directory where this package was decompressed.
 
 [Install Julia](https://julialang.org/downloads/) and launch it. You should see the following prompt:
 ```julia
@@ -42,9 +42,9 @@ Typing backspace allows to go back to the prompt
 ```julia
 julia>
 ```
-Activate the environment of DynamicFoam.jl as follows:
+Activate the environment of VoroX.jl as follows:
 ```julia
-(@v1.6) pkg> activate path/to/DynamicFoam
+(@v1.6) pkg> activate path/to/VoroX
 ```
 Now install its dependencies as follows:
 ```julia
@@ -53,7 +53,7 @@ Now install its dependencies as follows:
 The installation should take a while.
 Once this is done, to launch the software with `K` points and `N` dimensions, do
 ```julia
-julia> using DynamicFoam
+julia> using VoroX
 
 julia> foam(K, N)
 ```

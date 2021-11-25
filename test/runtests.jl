@@ -5,11 +5,11 @@ import CDDLib
 import QHull
 import VoronoiDelaunay
 import MiniQhull
-include("../src/DynamicFoam.jl")
+include("../src/VoroX.jl")
 
 function _test_grid(n, lib)
     points = [SVector{2,Float64}(x, y) for x in -n:n for y in -n:n]
-    return DynamicFoam.Foam(points, lib, DynamicFoam.NonPeriodic(), DynamicFoam.Circumcenter())
+    return VoroX.Foam(points, lib, VoroX.NonPeriodic(), VoroX.Circumcenter())
 end
 
 function test_grid_0(lib)
@@ -54,14 +54,14 @@ function test_issue_55(lib)
         SVector( 0.8, -0.2),
         SVector( 0.0,  0.6),
     ]
-    foam = DynamicFoam.Foam(points, lib, DynamicFoam.NonPeriodic(), DynamicFoam.Circumcenter())
+    foam = VoroX.Foam(points, lib, VoroX.NonPeriodic(), VoroX.Circumcenter())
     @test size(foam.voronoi_edges) == (3, 3)
 end
 
 using Random
 function test_random_points(lib)
     Random.seed!(0)
-    points = DynamicFoam.random_points(10, SVector(-1.0, -1.0), SVector(1.0, 1.0), lib)
+    points = VoroX.random_points(10, SVector(-1.0, -1.0), SVector(1.0, 1.0), lib)
     @test points ≈ [
         [ 0.0,          0.0],
         [ 0.670087346,  0.153600819],
@@ -83,8 +83,8 @@ function test_center()
         SVector( 0, -1,  1/√2),
         SVector( 0,  1,  1/√2),
     ]
-    @test DynamicFoam.center(points, DynamicFoam.Circumcenter()) ≈ zeros(3) atol=1e-12
-    @test DynamicFoam.center(points, DynamicFoam.Centroid()) ≈ zeros(3) atol=1e-12
+    @test VoroX.center(points, VoroX.Circumcenter()) ≈ zeros(3) atol=1e-12
+    @test VoroX.center(points, VoroX.Centroid()) ≈ zeros(3) atol=1e-12
 end
 
 function hascol(A, cols)
@@ -105,7 +105,7 @@ function test_periodic(algo)
         SVector(-1/2, -1/2),
         SVector( 1/2, -1/2),
     ]
-    d = DynamicFoam.delaunay(points, algo, DynamicFoam.Periodic(SVector(2.0, 2.0)))
+    d = VoroX.delaunay(points, algo, VoroX.Periodic(SVector(2.0, 2.0)))
     @test size(d) == (3, 6)
     @test hascol(d, [[13, 14, 15]])
     @test hascol(d, [[4, 14, 15], [13, 23, 24]])
@@ -115,7 +115,7 @@ function test_periodic(algo)
     @test hascol(d, [[10, 13, 14], [13, 16, 17]])
 end
 
-LIBRARIES = DynamicFoam.LIBRARIES
+LIBRARIES = VoroX.LIBRARIES
 
 @testset "Test issue 55 $lib" for lib in LIBRARIES
     if lib != VoronoiDelaunay.DelaunayTessellation2D
@@ -135,7 +135,7 @@ end
 end
 
 @testset "random_points" begin
-    test_random_points(DynamicFoam.NN.GridTree)
+    test_random_points(VoroX.NN.GridTree)
 end
 
 @testset "center" begin

@@ -1,4 +1,4 @@
-module DynamicFoam
+module VoroX
 
 export foam
 
