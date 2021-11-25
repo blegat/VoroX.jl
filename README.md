@@ -1,6 +1,8 @@
 # Voro-X
 
-Generalizes [DynamicFoam](https://github.com/weigert/DynamicFoam) to 3D.
+This Julia packages implement the 2D and 3D simulation and visualization of the system concept introduced to me by Michel van de Gaer.
+An earlier implementation of the same concept restricted to 2D was developed in [DynamicFoam](https://github.com/weigert/DynamicFoam).
+The system dynamic is detailed in [here](https://github.com/weigert/DynamicFoam/wiki/System-Dynamics).
 
 ## Settings
 
@@ -8,6 +10,8 @@ Comparing to [DynamicFoam](https://github.com/weigert/DynamicFoam):
 * The criticality used is equivalent to an infinite criticality and cannot be changed.
 * If "Edge scale" is on, the dynamics is equivalent to [DynamicFoam](https://github.com/weigert/DynamicFoam): it scales the edges. If it is off, it scales delaunay simplices.
 * The "Height" setting changes the height of the rendering frame but does not influence the dynamics. The points are are samples in a fixed square or cube that cannot be changed.
+* The "Periodic" setting determines whether the meshes is considered infinitely periodic along each directions.
+* The "Voro shading" determines whether the Voronoi cells are displayed (if it is on) or the Delaynay cells (if it is off). The transparency of the shading is determined by the "Transparency" setting.
 
 ## Reporting issues
 
