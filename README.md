@@ -8,7 +8,7 @@ The currents themselves are regulated by the sharpness of the angles at the junc
 
 <img src="size.gif" height="86">
 
-Changing cell-sizes change the angles ...
+Changing cell-sizes changes the angles ...
 
 <img src="angles.png" height="172">
 
