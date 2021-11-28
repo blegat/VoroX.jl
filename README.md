@@ -1,6 +1,17 @@
 # Voro-X
 
 This Julia packages implement the 2D and 3D simulation and visualization of the system concept introduced to me by Michel van de Gaer.
+
+The mechanics is based on the idea that currents run along the edges and affects the size of the cells, heating them up or cooling them down, depending on their current.
+
+The currents themselves are regulated by the sharpness of the angles at the junctions, and act like a switch/gates.
+
+<img src="size.gif" height="240">
+
+Changing cell-sizes change the angles ...
+
+<img src="angles.png" height="240">
+
 An earlier implementation of the same concept restricted to 2D was developed in [DynamicFoam](https://github.com/weigert/DynamicFoam).
 The system dynamic is detailed in [here](https://github.com/weigert/DynamicFoam/wiki/System-Dynamics).
 
