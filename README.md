@@ -6,11 +6,11 @@ The mechanics is based on the idea that currents run along the edges and affects
 
 The currents themselves are regulated by the sharpness of the angles at the junctions, and act like a switch/gates.
 
-<img src="size.gif" height="240">
+<img src="size.gif" height="86">
 
 Changing cell-sizes change the angles ...
 
-<img src="angles.png" height="240">
+<img src="angles.png" height="172">
 
 An earlier implementation of the same concept restricted to 2D was developed in [DynamicFoam](https://github.com/weigert/DynamicFoam).
 The system dynamic is detailed in [here](https://github.com/weigert/DynamicFoam/wiki/System-Dynamics).
