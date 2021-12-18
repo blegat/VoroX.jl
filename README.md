@@ -2,6 +2,8 @@
 
 This Julia packages implement the 2D and 3D simulation and visualization of the system concept introduced to me by Michel van de Gaer.
 
+<img src="recording-1.gif" height="172">
+
 The mechanics is based on the idea that currents run along the edges and affects the size of the cells, heating them up or cooling them down, depending on their current.
 
 The currents themselves are regulated by the sharpness of the angles at the junctions, and act like a switch/gates.
