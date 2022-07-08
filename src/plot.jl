@@ -86,39 +86,31 @@ function clipped_edge(from, to, min_coords, max_coords::SVector{N}) where {N}
 end
 
 function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=scatter!, args...) where {N,T}
-    _periodic(is_periodic) = is_periodic ? Periodic(max_coords - min_coords) : NonPeriodic()
+    _periodic(is_periodic) = is_periodic ? HyperVoronoiDelaunay.Periodic(max_coords - min_coords) : HyperVoronoiDelaunay.NonPeriodic()
     set_theme!(backgroundcolor = ColorSchemes.tableau_red_black[end])
     fig = Figure(resolution = (1200, 1200))
     r, start = markersize_range(scatterfun, norm(max_coords - min_coords))
 
-    display_sl = labelslidergrid!(
+    display_sl = SliderGrid(
         fig,
-        ["Height", "Point size", "Center size", "Edge width", "Circuit width", "Decay", "Transparency"],
-        [100:2000, r, r, LinRange(0, 1, 20), LinRange(0.1, 10, 20), LinRange(0, 1, 100), LinRange(0.0, 1.0, 21)],
-        formats = [[x -> "$(round(x, digits = 5))" for _ in 1:6]; [x -> "$(round(x, digits = 2))"]],
+        (label = "Height", range = 100:2000, format = "{:.5f}", startvalue = 800),
+        (label = "Point size", range = r, format = "{:.5f}", startvalue = start),
+        (label = "Center size", range = r, format = "{:.5f}", startvalue = start / 2),
+        (label = "Edge width", range = LinRange(0, 1, 20), format = "{:.5f}", startvalue = 0.5),
+        (label = "Circuit width", range = LinRange(0.1, 10, 20), format = "{:.5f}", startvalue = 1),
+        (label = "Decay", range = LinRange(0, 1, 100), format = "{:.2f}", startvalue = 0.9),
+        (label = "Transparency", range = LinRange(0.0, 1.0, 21), format = "{:.2f}", startvalue = 0.4),
         width = WIDTH,
         tellheight = true
     )
 
-    set_close_to!(display_sl.sliders[1], 800)
-    set_close_to!(display_sl.sliders[2], start)
-    set_close_to!(display_sl.sliders[3], start / 2)
-    set_close_to!(display_sl.sliders[4], 0.5)
-    set_close_to!(display_sl.sliders[5], 1)
-    set_close_to!(display_sl.sliders[6], 0.9)
-    set_close_to!(display_sl.sliders[TRANSPARENCY], 0.4)
-
-    dynamic_sl = labelslidergrid!(
+    dynamic_sl = SliderGrid(
         fig,
-        ["Energy", "Scale"],
-        [LinRange(0, 0.01, 1000), LinRange(0, 1, 100)],
-        formats = [x -> "$(round(x, digits = 5))" for _ in 1:2],
+        (label = "Energy", range = LinRange(0, 0.01, 1000), format = "{:.5f}", startvalue = 0.0005),
+        (label = "Scale", range = LinRange(0, 1, 100), format = "{:.5f}", startvalue = 0.5),
         width = WIDTH,
         tellheight = true
     )
-
-    set_close_to!(dynamic_sl.sliders[ENERGY], 0.0005)
-    set_close_to!(dynamic_sl.sliders[SCALE], 0.5)
 
     edge_scale = Toggle(fig, active = true)
     equilibration = Toggle(fig, active = true)
@@ -168,31 +160,32 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
         obs_foam[] = Foam(_points(obs_foam[].points), current_library(), _periodic(periodic.active[]), current_centering(), min_coords, max_coords)
     end
 
-    num_points = labelslider!(fig, "Number of points", N:1000, format = x -> string(x), width=WIDTH, tellheight = true)
-    set_close_to!(num_points.slider, K)
-    resample_button = Button(fig, label = @lift(string("Resample ", $(num_points.slider.value), " points")))
+    num_points = SliderGrid(
+        fig,
+        (label = "Number of points", range = N:1000, format = "{}", startvalue = K),
+        width=WIDTH,
+        tellheight = true,
+    )
+    resample_button = Button(fig, label = @lift(string("Resample ", $(num_points.sliders[1].value), " points")))
 
     function resample(n)
-        points = random_points(num_points.slider.value[], min_coords, max_coords, args...)
+        points = random_points(num_points.sliders[1].value[], min_coords, max_coords, args...)
         t[] = 1
         obs_foam[] = Foam(points, current_library(), _periodic(periodic.active[]), current_centering(), min_coords, max_coords)
     end
 
     on(resample, resample_button.clicks)
 
-    record_frames = labelslidergrid!(
+    record_frames = SliderGrid(
         fig,
-        ["Framerate", "Length"],
-        [1:30, 1:300],
-        formats = [x -> "$x fps", x -> "$x frames"],
+        (label = "Framerate", range = 1:30, format = "{} fps", startvalue = 10),
+        (label = "Length", range = 1:300, format = "{} fps", startvalue = 100),
         width = WIDTH,
-        tellheight = true
+        tellheight = true,
     )
-    set_close_to!(record_frames.sliders[1], 10)
-    set_close_to!(record_frames.sliders[2], 100)
     duration_fps = GridLayout()
     duration = Label(fig, @lift(string("Duration: ", round($(record_frames.sliders[2].value) / $(record_frames.sliders[1].value), digits=2), " seconds.")))
-    #cur_fps = Node(NaN)
+    #cur_fps = Observable(NaN)
     #cur_fps_label = Label(fig, @lift(isnan($cur_fps) ? "" : string(round($cur_fps, digits=2), " fps.")))
     #duration_fps[:h] = [duration, cur_fps_label]
     record_layout = GridLayout()
@@ -200,19 +193,19 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
     live_toggle = Toggle(fig, active = false)
     record_layout[:h] = [record_button, Label(fig, "Live"), live_toggle]
 
-    t = Node(1)
+    t = Observable(1)
     dt = 1
-    last_frame_time = Node(NaN)
+    last_frame_time = Observable(NaN)
     time = Label(fig, @lift(string($t, "th frame.", isnan($last_frame_time) ? "" : string(" ", round(inv($last_frame_time), digits=2), " fps."))))
     menu = GridLayout()
     menu[:v] = [time, display_sl.layout, dynamic_sl.layout, toggles, lib_layout, centering_layout, num_points.layout, resample_button, record_frames.layout, duration, record_layout]
 
-    obs_foam = Node{Foam{N,T}}()
-    delaunay_edges = Node(zeros(T, 0, 0))
+    obs_foam = Observable{Foam{N,T}}()
+    delaunay_edges = Observable(zeros(T, 0, 0))
     out_knot_edges_obs = Dict()
     knot_obs = []
-    foam_points = Node(SVector{N,T}[])
-    foam_centers = Node(SVector{N,T}[])
+    foam_points = Observable(SVector{N,T}[])
+    foam_centers = Observable(SVector{N,T}[])
     foam_cells = []
     s = LScene(fig, height = display_sl.sliders[HEIGHT].value, scenekw = (show_axis = false,))
 
@@ -253,7 +246,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
             @assert !haskey(out_knot_edges_obs, d)
             lw = @lift($(display_sl.sliders[CIRCUIT_WIDTH].value) * $(display_sl.sliders[DECAY].value)^d)
             col = @lift(ColorSchemes.haline[$(display_sl.sliders[DECAY].value)^d])
-            mobs = Node(_flat(out_knot_edges[d]))
+            mobs = Observable(_flat(out_knot_edges[d]))
             linesegments!(s, mobs, color=col, linewidth=lw)
             out_knot_edges_obs[d] = mobs
         end
@@ -271,7 +264,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
             m = _flat(d)
             i += 1
             if i > length(knot_obs)
-                obs = Node(m)
+                obs = Observable(m)
                 lines!(s, obs, color=ColorSchemes.speed[0.5], linewidth = display_sl.sliders[CIRCUIT_WIDTH].value)
                 push!(knot_obs, obs)
             else
