@@ -5,11 +5,12 @@ import CDDLib
 import QHull
 import VoronoiDelaunay
 import MiniQhull
+import HyperVoronoiDelaunay
 include("../src/VoroX.jl")
 
 function _test_grid(n, lib)
     points = [SVector{2,Float64}(x, y) for x in -n:n for y in -n:n]
-    return VoroX.Foam(points, lib, VoroX.NonPeriodic(), VoroX.Circumcenter())
+    return VoroX.Foam(points, lib, HyperVoronoiDelaunay.NonPeriodic(), VoroX.Circumcenter())
 end
 
 function test_grid_0(lib)
@@ -23,9 +24,9 @@ function test_grid_1(lib)
     @test length(foam.centers) == 8
     @test all(c -> all(abs.(c) .≈ 0.5), foam.centers)
     @test size(foam.voronoi_edges) == (3, 8)
-    @test 8 <= count(iszero, foam.voronoi_edges) <= 18
+    @test 8 <= count(iszero, foam.voronoi_edges) <= 22
     @test size(foam.active_edges) == (3, 8)
-    @test 8 <= count(iszero, foam.active_edges) <= 20
+    @test 8 <= count(iszero, foam.active_edges) <= 24
     @test 0 <= length(foam.knots) <= 2
     for knot in foam.knots
         @test sort(getindex.(knot, 2)) == 1:8
@@ -54,7 +55,7 @@ function test_issue_55(lib)
         SVector( 0.8, -0.2),
         SVector( 0.0,  0.6),
     ]
-    foam = VoroX.Foam(points, lib, VoroX.NonPeriodic(), VoroX.Circumcenter())
+    foam = VoroX.Foam(points, lib, HyperVoronoiDelaunay.NonPeriodic(), VoroX.Circumcenter())
     @test size(foam.voronoi_edges) == (3, 3)
 end
 
@@ -63,16 +64,16 @@ function test_random_points(lib)
     Random.seed!(0)
     points = VoroX.random_points(10, SVector(-1.0, -1.0), SVector(1.0, 1.0), lib)
     @test points ≈ [
-        [ 0.0,          0.0],
-        [ 0.670087346,  0.153600819],
-        [ 0.666462902, -0.503069459],
-        [ 0.977731941,  0.407310927],
-        [ 0.344192411,  0.514585898],
-        [ 0.235859624, -0.292309593],
-        [-0.359376319, -0.169391956],
-        [ 0.164568279, -0.664826577],
-        [-0.359350030, -0.928460908],
-        [-0.240282715,  0.438854948],
+        [0.0,           0.0],
+        [0.3800315515,  0.030874917],
+        [0.2960086941, -0.358495838],
+        [-0.134591813, -0.341442487],
+        [0.1603910181,  0.455165450],
+        [-0.529081597,  0.070297047],
+        [0.2486058990, -0.917995138],
+        [-0.355779492, -0.664489558],
+        [-0.857012677, -0.621931050],
+        [-0.731416925, -0.238293904],
     ]
 end
 
@@ -105,7 +106,7 @@ function test_periodic(algo)
         SVector(-1/2, -1/2),
         SVector( 1/2, -1/2),
     ]
-    d = VoroX.delaunay(points, algo, VoroX.Periodic(SVector(2.0, 2.0)))
+    d = HyperVoronoiDelaunay.delaunay(points, algo, HyperVoronoiDelaunay.Periodic(SVector(2.0, 2.0)))
     @test size(d) == (3, 6)
     @test hascol(d, [[13, 14, 15]])
     @test hascol(d, [[4, 14, 15], [13, 23, 24]])

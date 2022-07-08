@@ -168,10 +168,10 @@ function Foam(points::Union{Vector{SVector{N,T}},PeriodicVector{N,T}}, simplices
     )
 end
 
-periodify(points, ::NonPeriodic) = points
-periodify(points, p::Periodic) = PeriodicVector(points, p.period)
+periodify(points, ::HyperVoronoiDelaunay.NonPeriodic) = points
+periodify(points, p::HyperVoronoiDelaunay.Periodic) = PeriodicVector(points, p.period)
 
-function Foam(points::Vector{SVector{N,T}}, algo, periodic::Union{NonPeriodic,Periodic}, args...) where {N,T}
-    simplices = delaunay(points, algo, periodic)
+function Foam(points::Vector{SVector{N,T}}, algo, periodic::Union{HyperVoronoiDelaunay.NonPeriodic,HyperVoronoiDelaunay.Periodic}, args...) where {N,T}
+    simplices = HyperVoronoiDelaunay.delaunay(points, algo, periodic)
     return Foam(periodify(points, periodic), convert(Matrix{Int}, simplices), args...)
 end

@@ -14,7 +14,7 @@ function _flat(points::Vector{SVector{N,T}}) where {N,T}
     return m
 end
 
-function shrink(v::VRepresentation, scaling)
+function shrink(v::Polyhedra.VRepresentation, scaling)
     c = center(points(v), Centroid())
     return vrep(map(points(v)) do p
         c + (p - c) * scaling
@@ -291,7 +291,7 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
         empty!(foam_cells)
         if display_sl.sliders[TRANSPARENCY].value[] > 0
             if foam.points isa PeriodicVector
-                cube = reduce(*, [HalfSpace(SVector(one(T)), max_coords[i]) ∩ HalfSpace(SVector(-one(T)), -min_coords[i]) for i in 1:N])
+                cube = reduce(*, [Polyhedra.HalfSpace(SVector(one(T)), max_coords[i]) ∩ Polyhedra.HalfSpace(SVector(-one(T)), -min_coords[i]) for i in 1:N])
             else
                 cube = nothing
             end
@@ -337,9 +337,9 @@ function main(K, min_coords::SVector{N,T}, max_coords::SVector{N,T}, scatterfun=
                 end
             end
             cell_polyhedra = map(cell_points) do (cell_p, catchment)
-                vr = vrep(cell_p)
+                vr = Polyhedra.vrep(cell_p)
                 #p = polyhedron(shrink(vr, 0.8))
-                p = polyhedron(vr)
+                p = Polyhedra.polyhedron(vr)
                 if cube !== nothing
                     p = p ∩ cube
                 end
